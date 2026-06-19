@@ -1,0 +1,27 @@
+# Render Blueprint — deploy as: New → Blueprint → pick this repo
+services:
+  - type: web
+    name: octal-vote
+    runtime: node
+    plan: starter # 0.5 CPU / 512MB is enough for 100–200 users; bump to standard for headroom
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /login
+    # Persistent disk: the SQLite file lives here so votes survive restarts & deploys
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: NODE_ENV
+        value: production
+      - key: ALLOWED_EMAIL_DOMAIN
+        value: octalsoftware.com
+      - key: OTP_CODE
+        value: '1234'
+      - key: ADMIN_EMAILS
+        value: manish.prajapati@octalsoftware.com
+      - key: JWT_SECRET
+        generateValue: true # Render generates a strong secret automatically

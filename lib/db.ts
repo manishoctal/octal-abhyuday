@@ -3,7 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import type { AppState, Candidate, CandidateWithVotes, Gender, VotingRound, VotingState } from './types';
 
-const DB_DIR = path.join(process.cwd(), 'data');
+// On Render (and any host) point DATA_DIR at the mounted persistent disk so the
+// SQLite file survives restarts and deploys. Falls back to ./data locally.
+const DB_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DB_DIR, 'vote.db');
 
 /** How many candidates per gender advance from the round-1 qualifier */
