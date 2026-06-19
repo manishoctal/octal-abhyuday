@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Gold shimmer text for winners */
+.gold-text {
+  background: linear-gradient(90deg, #b45309, #fbbf24, #fef3c7, #fbbf24, #b45309);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.5s linear infinite;
+}
+
+/* Animated gold border for winner cards */
+.gold-border {
+  position: relative;
+}
+.gold-border::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: linear-gradient(120deg, #fbbf24, #fef3c7, #f59e0b, #fde68a, #fbbf24);
+  background-size: 300% 300%;
+  animation: shimmer 3s linear infinite;
+  z-index: -1;
+}
+
+/* Lightning flash overlay on the results stage */
+.lightning-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 30% 0%, rgba(255, 255, 255, 0.85), transparent 60%);
+  animation: lightning 5s linear infinite;
+  z-index: 5;
+}
+.lightning-flash.delay {
+  background: radial-gradient(ellipse at 75% 0%, rgba(186, 230, 253, 0.8), transparent 55%);
+  animation-delay: 2.3s;
+}
+
+/* Sparkle particles */
+.sparkle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  background: #fde68a;
+  animation: sparkle 1.6s ease-in-out infinite;
+}
+
+/* Number tick-up */
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); color: #16a34a; }
+  100% { transform: scale(1); }
+}
+.vote-pop {
+  animation: pop 0.5s ease-out;
+}
+
+/* Heart burst on vote */
+@keyframes heart-burst {
+  0% { transform: scale(0); opacity: 1; }
+  70% { transform: scale(1.6); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.heart-burst {
+  animation: heart-burst 0.7s ease-out forwards;
+}

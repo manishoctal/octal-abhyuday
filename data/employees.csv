@@ -1,0 +1,109 @@
+S.no,Emp Code,Name,Official Email ID,Gender,Photo
+1,1290,Neha Kumari,neha.kumari@octalsoftware.com,Female,1290.png
+2,1311,Palak Khandelwal,palak.khandelwal@octalsoftware.com,Female,1311.png
+3,1805,Shivani Saxena,shivani.saxena@octalsoftware.com,Female,1805.png
+4,1809,Divya Makhija,divya.makhija@octalsoftware.com,Female,1809.png
+5,1810,Khushbu Soni,khushbu.soni@octalsoftware.com,Female,1810.png
+6,1832,Priyakshi Jain,priyakshi.jain@octalsoftware.com,Female,1832.png
+7,1843,Simran Goutam,simran.goutam@octalsoftware.com,Female,1843.png
+8,1853,Monika Mittal,monika.mittal@octalsoftware.com,Female,1853.png
+9,1865,Rupal Tank,rupal.tank@octalsoftware.com,Female,1865.png
+10,1881,Komal Pushkar,komal.pushkar@octalsoftware.com,Female,1881.png
+11,1882,Gunjan Sharma,gunjan.sharma@octalsoftware.com,Female,1882.png
+12,1890,Kanishka Bulia,kanishka.bulia@octalsoftware.com,Female,1890.png
+13,1895,Pragya Jain,pragya.jain@octalsoftware.com,Female,1895.png
+14,1904,Rishika Sharma,rishika.sharma@octalsoftware.com,Female,1904.png
+15,1909,Krati Sharma,krati.sharma@octalsoftware.com,Female,1909.png
+16,1918,Dinki Khatwani,dinki.khatwani@octalsoftware.com,Female,1918.png
+17,1925,Shipra Saxena,shipra.saxena@octalsoftware.com,Female,1925.png
+18,1932,Neha Parnani,neha.parnani@octalsoftware.com,Female,1932.png
+19,1934,Rutuja Deshmukh,rutuja.deshmukh@octalsoftware.com,Female,1934.png
+20,1941,Bhanushi Goyal,bhanushi.goyal@octalsoftware.com,Female,1941.png
+21,1944,Jyoti verma,87jyotiverma@gmail.com,Female,1944.png
+22,1953,shivani goutam,shivani.gotam@octalsoftware.com,Female,1953.png
+23,1954,Nidhi Suman,nidhi.suman@octalsoftware.com,Female,1954.png
+24,1963,khushboo Soni ( DM),khushboo@octalsoftware.com,Female,1963.png
+25,1964,Mansi Bidawat,harshitbidawat@gmail.com,Female,1964.png
+26,1968,Neeti Kotia,neeti.kotia@gmail.com,Female,1968.png
+27,1970,Jyoti,jyoti.bhardwaj@octalsoftware.com,Female,1970.png
+28,1975,Nishi Garg,nishi.garg@octalsoftware.com,Female,1975.png
+29,1976,Shruti sharma,ss5945775@gmail.com,Female,1976.png
+30,1978,Yogita Prajapat,yogitaprajapat4110@gmail.com,Female,1978.png
+31,1981,Deepika Sain,Deepika.sain@octalsoftware.com,Female,1981.png
+32,1984,Reena Lalwani,reena.lalwani@octalsoftware.com,Female,1984.png
+33,1985,Anushika Gupta,anushika.gupta@octalsoftware.com,Female,1985.png
+34,1991,Neha Rathore,neha.rathore@octalsoftware.com,Female,1991.png
+35,1992,Mansi Parmar,mansi.parmar@octalsoftware.com,Female,1992.png
+36,1993,Moni Sharma,moni.sharma@octalsoftware.com,Female,1993.png
+37,1001,Arun Goyal,arun.goyal@octalsoftware.com,Male,1001.png
+38,1070,Priyank Sharma,priyank.sharma@octalsoftware.com,Male,1070.png
+39,1097,Lalit Kishore Nagar,lalit.nagar@octalsoftware.com,Male,1097.png
+40,1224,Tarun Takyar,tarun.takyar@octalsoftware.com,Male,1224.png
+41,1269,Naveen Khanna,naveen.khanna@octalsoftware.com,Male,1269.png
+42,1347,Dinesh Kumar Shilak,dinesh.shilak@octalsoftware.com,Male,1347.png
+43,1416,Raj Kumar,noc@octalsoftware.com,Male,1416.png
+44,1423,Manish Kumar,manish.prajapati@octalsoftware.com,Male,1423.png
+45,1542,Prakash Takar,prakash.takar@octalinfosolution.com,Male,1542.png
+46,1552,Shashank Bansal,shashank.bansal@octalinfosolution.com,Male,1552.png
+47,1573,Jagat Singh Shekhawat,account@octalsoftware.com,Male,1573.png
+48,1615,Sagar Kumawat,sagar.kumawat@octalsoftware.com,Male,1615.png
+49,1623,Rinku kumar Saini,rinku.saini@octalinfosolution.com,Male,1623.png
+50,1630,Deepak Sharma,deepak.sharma1@octalinfosolution.com,Male,1630.png
+51,1675,Bhoopendra Kumar Jogi,bhoopendra.jogi@octalinfosolution.com,Male,1675.png
+52,1678,Sandeep Verma,sandeep.verma@octalsoftware.net,Male,1678.png
+53,1688,Iftekhar Ahmed,iftekhar.ahmed@octalsoftware.com,Male,1688.png
+54,1715,Aasif Khan,aasif.khan@octalinfosolution.com,Male,1715.png
+55,1726,Karmpal Singh,karmpal.singh@octalsoftware.com,Male,1726.png
+56,1735,Harsh sharma,harsh.sharma@octalsoftware.com,Male,1735.png
+57,1737,Himanshu Shrotriya,himanshu.shrotriya@octalsoftware.com,Male,1737.png
+58,1776,Harpreet Singh,harpreet.singh@octalinfosolution.com,Male,1776.png
+59,1785,Manish Kumar Jangid,manish.kumar@octalinfosolution.com,Male,1785.png
+60,1788,Ajay Khandelwal,ajay.khandelwal@octalsoftware.com,Male,1788.png
+61,1800,Arpit Khandelwal,arpit.khandelwal@octalsoftware.com,Male,1800.png
+62,1815,Sudhanshu Sharma,Sudhanshu.sharma@octalsoftware.com,Male,1815.png
+63,1844,Himanshu Sharma,himanshu.sharma@octalsoftware.com,Male,1844.png
+64,1863,Saurabh yagyik,saurabh.yagyik@octalsoftware.com,Male,1863.png
+65,1880,Amit Kumar Yadav,amit.yadav@octalsoftware.com,Male,1880.png
+66,1883,Rajat Kumawat,rajat.kumawat@octalsoftware.com,Male,1883.png
+67,1884,Pulkit Mathur,pulkit.mathur@octalsoftware.com,Male,1884.png
+68,1905,Rahul Sain,rahul.sain@octalsoftware.com,Male,1905.png
+69,1908,Abhiman Singh Yadav,abhimaan.yadav@octalsoftware.com,Male,1908.png
+70,1911,Himanshu Khandelwal,himanshu.khandelwal@octalsoftware.com,Male,1911.png
+71,1919,Kanak Bansal,kanak.bansal@octalsoftware.com,Male,1919.png
+72,1920,Nikhil Chaturvedi,nikhil.chaturvedi@octalsoftware.com,Male,1920.png
+73,1921,Luv Sharma,luv.sharma@octalinfosolution.com,Male,1921.png
+74,1926,Anmol Sen,anmol.sen@octalsoftware.com,Male,1926.png
+75,1927,Purushotam Baheti,purushotam.baheti@octalsoftware.com,Male,1927.png
+76,1928,Shashank Shekhar Tripathi,shashank.tripathi@octalsoftware.com,Male,1928.png
+77,1931,Chirag Kumhar,chirag.kumhar@octalsoftware.com,Male,1931.png
+78,1936,Prem Saini,prem.saini@octalsoftware.com,Male,1936.png
+79,1939,Chhatrapal Singh Choudhary,chhatrapal.singh@octalsoftware.com,Male,1939.png
+80,1940,Vijay Raj Panchal,vijay.panchal@octalsoftware.com,Male,1940.png
+81,1943,Daksh Jain,daksh.jain@octalsoftware.com,Male,1943.png
+82,1949,Arun lohia,arun.lohia@octalsoftware.com,Male,1949.png
+83,1951,Akhil Verma,akhil.verma@octalsoftware.com,Male,1951.png
+84,1952,Ganesh Yadav,ganesh.yadav@octalsoftware.com,Male,1952.png
+85,1955,Rohit meerwal,rohit.meerwal@octalsoftware.com,Male,1955.png
+86,1956,Mohit Nigam,mohit.nigam@octalsoftware.com,Male,1956.png
+87,1957,Shazaib Ahmed,shazaib.ahmed@octalsoftware.com,Male,1957.png
+88,1958,Devashish Sil,devashish.sil@octalsoftware.com,Male,1958.png
+89,1938,Abul Aula Jasser,abul.jasser@octalsoftware.com,Male,1938.png
+90,1960,kartik verma,,Male,1960.png
+91,1961,Rajat,rajat.sharma@octalsoftware.com,Male,1961.png
+92,1965,Mayank Rathore,mayank.rathore@octalsoftware.com,Male,1965.png
+93,1966,Prakhar Gupta,prakhar.gupta@octalsoftware.com,Male,1966.png
+94,1967,Arpit Kumar Mittal,arpitmittal050603@gmail.com,Male,1967.png
+95,1971,Jayesh Tiwari,jayesh.tiwari@octalsoftware.com,Male,1971.png
+96,1972,Govind Kumawat,govind.kumawat@octalsoftware.com,Male,1972.png
+97,1973,Shubham Sharma,shubham.sharma@octalsoftware.com,Male,1973.png
+98,1974,Himanshu Goyal,himanshu.goyal@octalsoftware.com,Male,1974.png
+99,1977,Chandrachud Singh Rathore,chandrachud.singh@octalsoftware.com,Male,1977.png
+100,1979,Kunal kumar,kunal.kumar@octalsoftware.com,Male,1979.png
+101,1980,Nitin jain,jainnitin200029@gmail.com,Male,1980.png
+102,1982,Raghav  Kumar,raghav.kumar@octalsoftware.com,Male,1982.png
+103,1983,Abhishek Singh,abhishek.singh@octalsoftware.com,Male,1983.png
+104,1986,Piyush Bansal,piyush.bansal@octalsoftware.com,Male,1986.png
+105,1987,Ekagra Verma,ekagraverma111@gmail.com,Male,1987.png
+106,1988,Aarav Saxena,aarav.saxena@octalsoftware.com,Male,1988.png
+107,1990,Sunil Jangid,jangidsunil100@gmail.com,Male,1990.png
+108,1994,Shubham malav,shubham.malav@octalsoftware.com,Male,1994.png
