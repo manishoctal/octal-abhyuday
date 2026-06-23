@@ -311,6 +311,173 @@ export function promoteFinalists(candidateIds: number[]) {
   run();
 }
 
+// ---------- Phase 1 migrations ----------
+
+const userCols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
+  (c) => c.name
+);
+if (!userCols.includes('department')) {
+  db.exec(`ALTER TABLE users ADD COLUMN department TEXT`);
+}
+if (!userCols.includes('profile_photo_url')) {
+  db.exec(`ALTER TABLE users ADD COLUMN profile_photo_url TEXT`);
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS schedule_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT,
+    location TEXT,
+    speaker TEXT,
+    type TEXT NOT NULL DEFAULT 'session' CHECK (type IN ('session','meal','break','activity','ceremony')),
+    description TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS event_info (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    section TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS attendance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    checked_in_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id)
+  );
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    platform TEXT NOT NULL DEFAULT 'web' CHECK (platform IN ('web','android','ios')),
+    subscription TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, platform)
+  );
+`);
+
+// ---------- user profile ----------
+
+export function updateUserProfile(userId: number, department: string | null, profilePhotoUrl: string | null) {
+  db.prepare('UPDATE users SET department = ?, profile_photo_url = ? WHERE id = ?').run(
+    department, profilePhotoUrl, userId
+  );
+}
+
+export function getUserById(id: number) {
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as
+    | { id: number; email: string; name: string; department: string | null; profile_photo_url: string | null }
+    | undefined;
+}
+
+// ---------- schedule ----------
+
+export interface ScheduleSession {
+  id: number;
+  title: string;
+  start_time: string;
+  end_time: string | null;
+  location: string | null;
+  speaker: string | null;
+  type: 'session' | 'meal' | 'break' | 'activity' | 'ceremony';
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export function listScheduleSessions(): ScheduleSession[] {
+  return db.prepare('SELECT * FROM schedule_sessions ORDER BY start_time ASC, sort_order ASC').all() as ScheduleSession[];
+}
+
+export function createScheduleSession(data: Omit<ScheduleSession, 'id' | 'created_at'>) {
+  const info = db.prepare(
+    `INSERT INTO schedule_sessions (title, start_time, end_time, location, speaker, type, description, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(data.title, data.start_time, data.end_time ?? null, data.location ?? null,
+        data.speaker ?? null, data.type, data.description ?? null, data.sort_order);
+  return db.prepare('SELECT * FROM schedule_sessions WHERE id = ?').get(info.lastInsertRowid) as ScheduleSession;
+}
+
+export function updateScheduleSession(id: number, data: Omit<ScheduleSession, 'id' | 'created_at'>) {
+  db.prepare(
+    `UPDATE schedule_sessions SET title=?, start_time=?, end_time=?, location=?, speaker=?, type=?, description=?, sort_order=? WHERE id=?`
+  ).run(data.title, data.start_time, data.end_time ?? null, data.location ?? null,
+        data.speaker ?? null, data.type, data.description ?? null, data.sort_order, id);
+}
+
+export function deleteScheduleSession(id: number) {
+  db.prepare('DELETE FROM schedule_sessions WHERE id = ?').run(id);
+}
+
+// ---------- event info ----------
+
+export interface EventInfoItem {
+  id: number;
+  section: string;
+  title: string;
+  body: string;
+  sort_order: number;
+}
+
+export function listEventInfo(): EventInfoItem[] {
+  return db.prepare('SELECT * FROM event_info ORDER BY section ASC, sort_order ASC').all() as EventInfoItem[];
+}
+
+export function upsertEventInfo(id: number | null, section: string, title: string, body: string, sortOrder: number) {
+  if (id) {
+    db.prepare('UPDATE event_info SET section=?, title=?, body=?, sort_order=? WHERE id=?').run(section, title, body, sortOrder, id);
+  } else {
+    db.prepare('INSERT INTO event_info (section, title, body, sort_order) VALUES (?, ?, ?, ?)').run(section, title, body, sortOrder);
+  }
+}
+
+export function deleteEventInfo(id: number) {
+  db.prepare('DELETE FROM event_info WHERE id = ?').run(id);
+}
+
+// ---------- attendance ----------
+
+export function checkIn(userId: number) {
+  return db.prepare(
+    'INSERT OR IGNORE INTO attendance (user_id) VALUES (?)'
+  ).run(userId);
+}
+
+export function getAttendance(userId: number) {
+  return db.prepare('SELECT * FROM attendance WHERE user_id = ?').get(userId) as
+    | { id: number; user_id: number; checked_in_at: string }
+    | undefined;
+}
+
+export function listAttendance() {
+  return db.prepare(
+    `SELECT a.*, u.name, u.email, u.department
+     FROM attendance a JOIN users u ON u.id = a.user_id
+     ORDER BY a.checked_in_at DESC`
+  ).all() as { id: number; user_id: number; checked_in_at: string; name: string; email: string; department: string | null }[];
+}
+
+// ---------- push subscriptions ----------
+
+export function savePushSubscription(userId: number, platform: 'web' | 'android' | 'ios', subscription: string) {
+  db.prepare(
+    `INSERT INTO push_subscriptions (user_id, platform, subscription) VALUES (?, ?, ?)
+     ON CONFLICT(user_id, platform) DO UPDATE SET subscription = excluded.subscription`
+  ).run(userId, platform, subscription);
+}
+
+export function deletePushSubscription(userId: number, platform: 'web' | 'android' | 'ios') {
+  db.prepare('DELETE FROM push_subscriptions WHERE user_id = ? AND platform = ?').run(userId, platform);
+}
+
+export function getAllPushSubscriptions() {
+  return db.prepare('SELECT * FROM push_subscriptions').all() as
+    { id: number; user_id: number; platform: string; subscription: string }[];
+}
+
 /** Vote-based promotion: the admin chooses how many advance per gender.
  *  Ties at the cutoff are included (when the cutoff has actual votes). */
 export function promoteTopByVotes(

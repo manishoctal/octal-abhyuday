@@ -1,0 +1,36 @@
+{
+  "name": "Octal Event",
+  "short_name": "OctalEvent",
+  "description": "Company event app — schedules, voting, Q&A, gallery, and more",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "src": "/icons/icon-192.svg",
+      "purpose": "any maskable"
+    },
+    {
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "src": "/icons/icon-512.svg",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Schedule",
+      "url": "/schedule",
+      "description": "Event schedule"
+    },
+    {
+      "name": "Vote",
+      "url": "/vote",
+      "description": "Popularity voting"
+    }
+  ]
+}

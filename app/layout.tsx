@@ -6,7 +6,10 @@ export function generateMetadata(): Metadata {
   const eventName = getAppState().event_name;
   return {
     title: `${eventName} — Octal IT Solutions`,
-    description: `Vote for the Most Popular Male & Female at ${eventName}`,
+    description: `Your event companion for ${eventName} — schedule, voting, Q&A, gallery, and more.`,
+    manifest: '/manifest.json',
+    appleWebApp: { capable: true, statusBarStyle: 'default', title: eventName },
+    icons: { icon: '/icons/icon-192.svg', apple: '/icons/icon-192.svg' },
   };
 }
 
@@ -14,6 +17,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  themeColor: '#6366f1',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

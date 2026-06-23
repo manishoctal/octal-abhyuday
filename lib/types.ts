@@ -41,6 +41,48 @@ export interface SessionUser {
   isAdmin: boolean;
 }
 
+/* ---------- Phase 1: Event platform ---------- */
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  name: string;
+  department: string | null;
+  profile_photo_url: string | null;
+}
+
+export type ScheduleSessionType = 'session' | 'meal' | 'break' | 'activity' | 'ceremony';
+
+export interface ScheduleSession {
+  id: number;
+  title: string;
+  start_time: string;
+  end_time: string | null;
+  location: string | null;
+  speaker: string | null;
+  type: ScheduleSessionType;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface EventInfoItem {
+  id: number;
+  section: string;
+  title: string;
+  body: string;
+  sort_order: number;
+}
+
+export interface AttendanceRecord {
+  id: number;
+  user_id: number;
+  checked_in_at: string;
+  name: string;
+  email: string;
+  department: string | null;
+}
+
 /* ---------- Live Q&A (Phase 2) ---------- */
 
 export type QaQuestionType = 'mcq' | 'text' | 'rating' | 'rank';
