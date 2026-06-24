@@ -2,6 +2,8 @@
 
 import useSWR from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
+import { useEffect, useRef, useState } from 'react';
 import { useRealtime } from './useRealtime';
 import type { CandidateWithVotes, AppState } from '@/lib/types';
 
@@ -147,18 +149,61 @@ function GenderColumn({
 }
 
 export default function VotingStageClient({ eventName }: { eventName: string }) {
-  useRealtime(['/api/admin/stats']);
+  useRealtime(['/api/admin/stats', '/api/awards']);
   const { data } = useSWR<StatsResponse>('/api/admin/stats', fetcher, {
     refreshInterval: 10000,
   });
+  const { data: awardsData } = useSWR('/api/awards', fetcher, { refreshInterval: 8000 });
 
   const votingState = data?.state.voting_state ?? 'not_started';
   const topMale   = data?.topMale   ?? [];
   const topFemale = data?.topFemale ?? [];
   const stats     = data?.stats;
 
+  const winners = (awardsData?.categories ?? []).filter((c: { winner?: unknown }) => c.winner);
+  const winnerCount = winners.length;
+  const prevWinnerCount = useRef(0);
+  const [winnerBurst, setWinnerBurst] = useState<{ name: string; category: string } | null>(null);
+
+  useEffect(() => {
+    if (winnerCount > prevWinnerCount.current && winnerCount > 0) {
+      const latest = winners[winners.length - 1] as { name: string; winner: { name: string } };
+      setWinnerBurst({ name: latest.winner.name, category: latest.name });
+      const COLORS = ['#FE9234', '#FFD700', '#FF6B6B', '#4ECDC4', '#A78BFA', '#FFFFFF'];
+      confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 }, colors: COLORS, zIndex: 200 });
+      setTimeout(() => confetti({ particleCount: 120, spread: 60, angle: 60, origin: { x: 0, y: 0.7 }, colors: COLORS, zIndex: 200 }), 300);
+      setTimeout(() => confetti({ particleCount: 120, spread: 60, angle: 120, origin: { x: 1, y: 0.7 }, colors: COLORS, zIndex: 200 }), 500);
+      setTimeout(() => setWinnerBurst(null), 5000);
+    }
+    prevWinnerCount.current = winnerCount;
+  }, [winnerCount, winners]);
+
   return (
     <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 relative overflow-hidden text-white">
+      {/* Winner announcement overlay */}
+      <AnimatePresence>
+        {winnerBurst && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+          >
+            <div className="text-center px-8">
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ repeat: 3, duration: 0.5 }}
+                className="text-6xl mb-4"
+              >
+                🏆
+              </motion.div>
+              <p className="text-amber-300 font-bold text-lg uppercase tracking-widest mb-2">{winnerBurst.category}</p>
+              <h2 className="text-5xl sm:text-7xl font-black gold-text leading-tight">{winnerBurst.name}</h2>
+              <p className="text-2xl text-white/70 mt-3 font-bold">🎉 Congratulations! 🎉</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {SPARKLES.map((s, i) => (
         <span key={i} className="sparkle" style={{ top: s.top, left: s.left, animationDelay: s.delay }} />
       ))}

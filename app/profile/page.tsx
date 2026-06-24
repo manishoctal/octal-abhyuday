@@ -32,7 +32,6 @@ export default async function ProfilePage({
         <ProfileClient
           name={user?.name ?? session.name}
           email={user?.email ?? session.email}
-          department={user?.department ?? null}
           profilePhotoUrl={user?.profile_photo_url ?? null}
           required={required}
           useS3={isS3Configured()}

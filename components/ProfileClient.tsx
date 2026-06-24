@@ -7,7 +7,6 @@ import { Camera, CheckCircle2 } from 'lucide-react';
 interface Props {
   name:            string;
   email:           string;
-  department:      string | null;
   profilePhotoUrl: string | null;
   required?:       boolean;
   useS3:           boolean;
@@ -28,9 +27,8 @@ function xhrPut(url: string, file: File, contentType: string, onProgress: (pct: 
   });
 }
 
-export default function ProfileClient({ name, email, department, profilePhotoUrl, required, useS3 }: Props) {
+export default function ProfileClient({ name, email, profilePhotoUrl, required, useS3 }: Props) {
   const router                          = useRouter();
-  const [dept, setDept]                 = useState(department ?? '');
   const [preview, setPreview]           = useState<string | null>(profilePhotoUrl);
   const [file, setFile]                 = useState<File | null>(null);
   const [saving, setSaving]             = useState(false);
@@ -76,13 +74,12 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
         const res = await fetch('/api/profile', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ department: dept, photoUrl: finalPhotoUrl }),
+          body:    JSON.stringify({ photoUrl: finalPhotoUrl }),
         });
         if (!res.ok) throw new Error('Failed to save profile');
       } else {
         /* ── Local: FormData upload ── */
         const fd = new FormData();
-        fd.append('department', dept);
         if (file) fd.append('photo', file);
         const res = await fetch('/api/profile', { method: 'POST', body: fd });
         if (!res.ok) throw new Error('Failed to save profile');
@@ -116,7 +113,7 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
           <p className="text-2xl mb-1">👋</p>
           <p className="font-bold text-slate-900">Welcome to ABHYUDAY!</p>
           <p className="text-sm text-slate-500 mt-1">
-            Add your photo and department so your teammates can recognise you.
+            Add your photo so your teammates can recognise you.
           </p>
         </div>
       )}
@@ -174,18 +171,6 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
             {preview ? 'Change photo' : 'Add profile photo'}
           </button>
         )}
-      </div>
-
-      {/* Department */}
-      <div className="card px-5 py-4">
-        <label htmlFor="dept" className="block text-sm font-semibold text-slate-700 mb-1.5">
-          Department <span className="text-slate-400 font-normal">(optional)</span>
-        </label>
-        <input id="dept" type="text" placeholder="e.g. Engineering, HR, Sales" value={dept}
-          onChange={e => { setDept(e.target.value); setSaved(false); }} className="input" />
-        <p className="text-[11px] text-slate-400 mt-1.5">
-          Used for your event badge and department-targeted announcements.
-        </p>
       </div>
 
       {saved && (

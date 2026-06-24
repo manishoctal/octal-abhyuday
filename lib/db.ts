@@ -205,10 +205,10 @@ export function listCandidates(gender: Gender | undefined, opts: ListOptions): C
     where.push('c.gender IS NOT NULL');
   }
   if (opts.finalistsOnly) where.push('c.is_finalist = 1');
-  const order = opts.orderByName ? 'c.name ASC' : 'vote_count DESC, c.name ASC';
+  const order = opts.orderByName ? 'c.name ASC' : 'vote_count DESC, MIN(v.updated_at) ASC, c.name ASC';
   return db
     .prepare(
-      `SELECT c.*, COUNT(v.id) AS vote_count
+      `SELECT c.*, COUNT(v.id) AS vote_count, MIN(v.updated_at) AS first_vote_at
        FROM candidates c
        LEFT JOIN votes v ON v.candidate_id = c.id AND v.round = ?
        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
@@ -731,6 +731,12 @@ export function listFeedback() {
   return db.prepare(
     'SELECT f.*, u.name, u.email FROM feedback f JOIN users u ON u.id=f.user_id ORDER BY f.submitted_at DESC'
   ).all() as (FeedbackRow & { name: string; email: string })[];
+}
+
+export function listAllUsers() {
+  return db.prepare(
+    `SELECT id, name, email, department, profile_photo_url FROM users ORDER BY name ASC`
+  ).all() as { id: number; name: string; email: string; department: string | null; profile_photo_url: string | null }[];
 }
 
 // ---------- points / gamification ----------
