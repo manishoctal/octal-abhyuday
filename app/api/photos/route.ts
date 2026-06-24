@@ -6,20 +6,21 @@ import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_SIZE  = 5 * 1024 * 1024;
 const MAX_FILES = 10;
+const JPEG_VARIANTS = new Set(['jfif', 'jpe', 'jif', 'jfi', 'jpeg']);
 
 export async function GET(req: Request) {
   const userOrErr = await requireUser();
   if (isErrorResponse(userOrErr)) return userOrErr;
-  const url = new URL(req.url);
-  const all  = url.searchParams.get('all')  === '1'; // admin: all photos
-  const mine = url.searchParams.get('mine') === '1'; // user: own photos (all statuses)
+  const url  = new URL(req.url);
+  const all  = url.searchParams.get('all')  === '1';
+  const mine = url.searchParams.get('mine') === '1';
 
   let photos;
   if (all)       photos = listPhotos(false);
   else if (mine) photos = listUserPhotos(userOrErr.id);
-  else           photos = listPhotos(true); // approved only
+  else           photos = listPhotos(true);
   return NextResponse.json({ photos });
 }
 
@@ -27,8 +28,24 @@ export async function POST(req: Request) {
   const userOrErr = await requireUser();
   if (isErrorResponse(userOrErr)) return userOrErr;
 
+  const ct = req.headers.get('content-type') ?? '';
+
+  /* ── S3 path: client already uploaded, just register the CloudFront URLs ── */
+  if (ct.includes('application/json')) {
+    const { urls } = await req.json() as { urls: string[] };
+    if (!urls?.length) return NextResponse.json({ error: 'No URLs provided' }, { status: 400 });
+    if (urls.length > MAX_FILES) return NextResponse.json({ error: `Max ${MAX_FILES} files` }, { status: 400 });
+
+    const results = urls.map(url => ({
+      id: addPhoto(userOrErr.id, userOrErr.name, url, null, null),
+      url,
+    }));
+    return NextResponse.json({ uploaded: results.length, results });
+  }
+
+  /* ── Local disk path: store files on server ── */
   const formData = await req.formData();
-  const files = formData.getAll('files') as File[];
+  const files    = formData.getAll('files') as File[];
 
   if (!files.length) return NextResponse.json({ error: 'No files' }, { status: 400 });
   if (files.length > MAX_FILES) return NextResponse.json({ error: `Max ${MAX_FILES} files` }, { status: 400 });
@@ -36,22 +53,18 @@ export async function POST(req: Request) {
   const oversized = files.find(f => f.size > MAX_SIZE);
   if (oversized) return NextResponse.json({ error: `"${oversized.name}" exceeds 5 MB limit` }, { status: 400 });
 
-  const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+  const dataDir    = process.env.DATA_DIR || path.join(process.cwd(), 'data');
   const uploadsDir = path.join(dataDir, 'uploads');
   fs.mkdirSync(uploadsDir, { recursive: true });
 
-  const JPEG_VARIANTS = new Set(['jfif', 'jpe', 'jif', 'jfi', 'jpeg']);
   const results: { id: number; url: string }[] = [];
-
   for (const file of files) {
-    const rawExt = (file.name.split('.').pop() ?? 'jpg').toLowerCase();
-    const ext = JPEG_VARIANTS.has(rawExt) ? 'jpg' : rawExt;
+    const rawExt  = (file.name.split('.').pop() ?? 'jpg').toLowerCase();
+    const ext     = JPEG_VARIANTS.has(rawExt) ? 'jpg' : rawExt;
     const filename = `${Date.now()}-${userOrErr.id}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-    const buf = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(path.join(uploadsDir, filename), buf);
+    fs.writeFileSync(path.join(uploadsDir, filename), Buffer.from(await file.arrayBuffer()));
     const url = `/uploads/${filename}`;
-    const id = addPhoto(userOrErr.id, userOrErr.name, url, null, null);
-    results.push({ id, url });
+    results.push({ id: addPhoto(userOrErr.id, userOrErr.name, url, null, null), url });
   }
 
   return NextResponse.json({ uploaded: results.length, results });

@@ -2,24 +2,42 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Camera, CheckCircle2 } from 'lucide-react';
 
 interface Props {
-  name: string;
-  email: string;
-  department: string | null;
+  name:            string;
+  email:           string;
+  department:      string | null;
   profilePhotoUrl: string | null;
-  required?: boolean; // true = first-time completion gate
+  required?:       boolean;
+  useS3:           boolean;
 }
 
-export default function ProfileClient({ name, email, department, profilePhotoUrl, required }: Props) {
-  const router = useRouter();
-  const [dept, setDept]       = useState(department ?? '');
-  const [preview, setPreview] = useState<string | null>(profilePhotoUrl);
-  const [file, setFile]       = useState<File | null>(null);
-  const [saving, setSaving]   = useState(false);
-  const [saved, setSaved]     = useState(false);
-  const [photoErr, setPhotoErr] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+/* ── XHR PUT for S3 presigned upload ── */
+function xhrPut(url: string, file: File, contentType: string, onProgress: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    });
+    xhr.addEventListener('load', () => xhr.status < 300 ? resolve() : reject(new Error(`HTTP ${xhr.status}`)));
+    xhr.addEventListener('error', () => reject(new Error('Network error')));
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.send(file);
+  });
+}
+
+export default function ProfileClient({ name, email, department, profilePhotoUrl, required, useS3 }: Props) {
+  const router                          = useRouter();
+  const [dept, setDept]                 = useState(department ?? '');
+  const [preview, setPreview]           = useState<string | null>(profilePhotoUrl);
+  const [file, setFile]                 = useState<File | null>(null);
+  const [saving, setSaving]             = useState(false);
+  const [photoProgress, setPhotoProgress] = useState<number | null>(null); // null = not uploading
+  const [saved, setSaved]               = useState(false);
+  const [photoErr, setPhotoErr]         = useState(false);
+  const fileRef                         = useRef<HTMLInputElement>(null);
 
   function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -35,26 +53,60 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
     if (required && !preview) { setPhotoErr(true); return; }
     setSaving(true);
     setSaved(false);
+    setPhotoProgress(null);
+
     try {
-      const fd = new FormData();
-      fd.append('department', dept);
-      if (file) fd.append('photo', file);
-      const res = await fetch('/api/profile', { method: 'POST', body: fd });
-      if (res.ok) {
-        if (required) {
-          router.push('/');
-        } else {
-          setSaved(true);
-          setFile(null);
-          router.refresh();
-        }
+      let finalPhotoUrl: string | null = null;
+
+      if (file && useS3) {
+        /* ── S3: presign → XHR PUT → send CloudFront URL ── */
+        setPhotoProgress(0);
+        const presignRes = await fetch('/api/upload/presign', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ filename: file.name, contentType: file.type || 'image/jpeg', context: 'profile' }),
+        });
+        if (!presignRes.ok) throw new Error('Failed to get upload URL');
+        const { presignedUrl, publicUrl } = await presignRes.json();
+
+        await xhrPut(presignedUrl, file, file.type || 'image/jpeg', pct => setPhotoProgress(pct));
+        finalPhotoUrl = publicUrl;
+        setPhotoProgress(100);
+
+        const res = await fetch('/api/profile', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ department: dept, photoUrl: finalPhotoUrl }),
+        });
+        if (!res.ok) throw new Error('Failed to save profile');
+      } else {
+        /* ── Local: FormData upload ── */
+        const fd = new FormData();
+        fd.append('department', dept);
+        if (file) fd.append('photo', file);
+        const res = await fetch('/api/profile', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Failed to save profile');
       }
+
+      if (required) {
+        // Hard redirect — bypasses Next.js router cache so the fresh
+        // profile_photo_url is read server-side before the gate check fires.
+        window.location.href = '/';
+      } else {
+        setSaved(true);
+        setFile(null);
+        setPhotoProgress(null);
+        router.refresh();
+      }
+    } catch {
+      /* keep form visible, user can retry */
     } finally {
       setSaving(false);
     }
   }
 
   const initial = name.charAt(0).toUpperCase();
+  const isUploadingPhoto = photoProgress !== null && photoProgress < 100;
 
   return (
     <form onSubmit={save} className="space-y-4 pb-4">
@@ -71,11 +123,7 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
 
       {/* Avatar */}
       <div className="card px-5 py-6 flex flex-col items-center">
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className="relative active:scale-95 transition-transform"
-        >
+        <button type="button" onClick={() => fileRef.current?.click()} className="relative active:scale-95 transition-transform">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="w-24 h-24 rounded-full object-cover ring-4 ring-orange-100" />
@@ -87,21 +135,31 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
               {initial}
             </div>
           )}
-          <span
-            className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow"
-            style={{ background: '#FE9234' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="1" y="3" width="12" height="9" rx="2" stroke="white" strokeWidth="1.2"/>
-              <circle cx="7" cy="7.5" r="2" stroke="white" strokeWidth="1.2"/>
-              <path d="M5 3l.7-1.5h2.6L9 3" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
+          <span className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow"
+            style={{ background: '#FE9234' }}>
+            <Camera size={14} strokeWidth={1.8} color="white" />
           </span>
         </button>
         <input ref={fileRef} type="file" accept="image/*,.jfif,.jpe,.jif,.jfi" className="hidden" onChange={pick} />
 
-        {photoErr && (
-          <p className="text-xs text-red-500 font-medium mt-2">Please add a profile photo to continue</p>
+        {photoErr && <p className="text-xs text-red-500 font-medium mt-2">Please add a profile photo to continue</p>}
+
+        {/* Photo upload progress bar */}
+        {photoProgress !== null && (
+          <div className="w-full mt-4 space-y-1.5">
+            <div className="flex justify-between text-xs font-medium">
+              <span className="text-slate-500">{photoProgress >= 100 ? 'Photo uploaded' : 'Uploading photo…'}</span>
+              <span style={{ color: photoProgress >= 100 ? '#22C55E' : '#FE9234' }}>{photoProgress}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full overflow-hidden bg-slate-100">
+              <div className="h-full rounded-full transition-all duration-300 ease-out"
+                style={{
+                  width: `${photoProgress}%`,
+                  background: photoProgress >= 100 ? '#22C55E' : 'linear-gradient(90deg, #FE9234, #FFAD5E)',
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {!required && (
@@ -112,12 +170,7 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
         )}
 
         {required && (
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="mt-4 text-sm font-semibold"
-            style={{ color: '#FE9234' }}
-          >
+          <button type="button" onClick={() => fileRef.current?.click()} className="mt-4 text-sm font-semibold" style={{ color: '#FE9234' }}>
             {preview ? 'Change photo' : 'Add profile photo'}
           </button>
         )}
@@ -128,33 +181,25 @@ export default function ProfileClient({ name, email, department, profilePhotoUrl
         <label htmlFor="dept" className="block text-sm font-semibold text-slate-700 mb-1.5">
           Department <span className="text-slate-400 font-normal">(optional)</span>
         </label>
-        <input
-          id="dept"
-          type="text"
-          placeholder="e.g. Engineering, HR, Sales"
-          value={dept}
-          onChange={e => { setDept(e.target.value); setSaved(false); }}
-          className="input"
-        />
+        <input id="dept" type="text" placeholder="e.g. Engineering, HR, Sales" value={dept}
+          onChange={e => { setDept(e.target.value); setSaved(false); }} className="input" />
         <p className="text-[11px] text-slate-400 mt-1.5">
           Used for your event badge and department-targeted announcements.
         </p>
       </div>
 
       {saved && (
-        <div
-          className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium"
-          style={{ background: '#DCFCE7', color: '#15803D' }}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium" style={{ background: '#DCFCE7', color: '#15803D' }}>
+          <CheckCircle2 size={16} strokeWidth={2} />
           Profile saved
         </div>
       )}
 
       <button type="submit" disabled={saving} className="btn-primary">
-        {saving ? 'Saving…' : required ? 'Continue to ABHYUDAY →' : 'Save Profile'}
+        {isUploadingPhoto ? `Uploading photo… ${photoProgress}%` :
+         saving           ? 'Saving…' :
+         required         ? 'Continue to ABHYUDAY →' :
+                            'Save Profile'}
       </button>
     </form>
   );

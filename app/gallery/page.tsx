@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import { getAppState, listPhotos, listUserPhotos } from '@/lib/db';
+import { isS3Configured } from '@/lib/s3';
 import GalleryClient from '@/components/GalleryClient';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export default async function GalleryPage() {
           initialApproved={listPhotos(true)}
           initialMine={listUserPhotos(session.id)}
           userId={session.id}
+          useS3={isS3Configured()}
         />
       </main>
       <BottomNav isAdmin={session.isAdmin} />

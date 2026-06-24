@@ -80,10 +80,10 @@ function CandidateBar({
       <div className="relative flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-2xl w-8 text-center shrink-0">{medal}</span>
-          {candidate.photo_url ? (
+          {candidate.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={candidate.photo_url}
+              src={candidate.image_url}
               alt=""
               className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-white/20"
             />
@@ -99,9 +99,6 @@ function CandidateBar({
             <p className="font-extrabold text-white text-base sm:text-lg leading-tight truncate">
               {candidate.name}
             </p>
-            {candidate.department && (
-              <p className="text-xs text-slate-400 font-medium truncate">{candidate.department}</p>
-            )}
           </div>
         </div>
         <span className="shrink-0 text-xl sm:text-2xl font-black text-amber-300">
