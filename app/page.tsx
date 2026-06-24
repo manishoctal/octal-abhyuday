@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
-import { getAppState, listScheduleSessions, getAttendance, getUserById } from '@/lib/db';
+import { getAppState, listScheduleSessions, getAttendance, getUserById, listAllUsers, listAwardCategories } from '@/lib/db';
 import { getLiveSession } from '@/lib/qa';
 import DashboardClient from '@/components/DashboardClient';
 
@@ -20,6 +20,8 @@ export default async function HomePage() {
   const schedule   = listScheduleSessions();
   const attendance = getAttendance(session.id);
   const liveQa     = getLiveSession();
+  const participants = listAllUsers().length;
+  const awardCount   = listAwardCategories().length;
 
   return (
     <>
@@ -34,6 +36,8 @@ export default async function HomePage() {
           userId={session.id}
           userName={session.name}
           liveQa={!!liveQa}
+          participants={participants}
+          awardCount={awardCount}
         />
       </main>
       <BottomNav isAdmin={session.isAdmin} />

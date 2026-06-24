@@ -4,20 +4,20 @@
   "description": "Octal IT Solution event companion — schedule, voting, Q&A, gallery, and more",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#FE9234",
+  "background_color": "#0F1035",
+  "theme_color": "#FF7A00",
   "orientation": "portrait",
   "icons": [
     {
-      "type": "image/svg+xml",
+      "type": "image/png",
       "sizes": "192x192",
-      "src": "/icons/icon-192.svg",
+      "src": "/icons/icon-192.png",
       "purpose": "any maskable"
     },
     {
-      "type": "image/svg+xml",
+      "type": "image/png",
       "sizes": "512x512",
-      "src": "/icons/icon-512.svg",
+      "src": "/icons/icon-512.png",
       "purpose": "any maskable"
     }
   ],
