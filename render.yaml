@@ -25,3 +25,23 @@ services:
         value: manish.prajapati@octalsoftware.com
       - key: JWT_SECRET
         generateValue: true # Render generates a strong secret automatically
+      # Push notifications (Web Push / VAPID). Generate with: npx web-push generate-vapid-keys
+      # Leave the keys blank here and paste real values in the Render dashboard (kept out of git).
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CONTACT_EMAIL
+        value: manish.prajapati@octalsoftware.com
+      # AWS S3 — photo storage (Phase 2+; gallery currently writes to the persistent disk).
+      # Set these in the dashboard when migrating photo storage to S3.
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: S3_PUBLIC_URL
+        sync: false

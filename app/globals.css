@@ -2,15 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ──────────────────────────────────────── */
 :root {
+  --brand:       #FE9234;
+  --brand-light: #FFF4E8;
+  --brand-dark:  #C85F10;
+  --surface:     #F8FAFC;
+  --card:        #FFFFFF;
+  --border:      #E8EDF2;
+  --ink:         #0F172A;
+  --ink-muted:   #64748B;
+  --ink-faint:   #94A3B8;
   color-scheme: light;
 }
 
+/* ── Base ───────────────────────────────────────────────── */
+html { -webkit-font-smoothing: antialiased; }
+
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  /* Reserve space for fixed bottom nav */
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
-/* Gold shimmer text for winners */
+/* ── Scrollbar — hidden, native feel ────────────────────── */
+::-webkit-scrollbar { display: none; }
+* { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Touch — remove tap flash ───────────────────────────── */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* ── Typography helpers ─────────────────────────────────── */
+.label-xs {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ── Btn — primary (orange) ─────────────────────────────── */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 56px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(254,146,52,0.30);
+  transition: opacity 0.15s, transform 0.15s;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary:active { opacity: 0.88; transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Card ───────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 0.5px rgba(0,0,0,0.03);
+}
+
+/* ── Input ──────────────────────────────────────────────── */
+.input {
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: var(--brand); }
+
+/* ── Section header ─────────────────────────────────────── */
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 0 2px;
+  margin-bottom: 10px;
+}
+
+/* ── Gold shimmer (winner reveal) ───────────────────────── */
 .gold-text {
   background: linear-gradient(90deg, #b45309, #fbbf24, #fef3c7, #fbbf24, #b45309);
   background-size: 200% auto;
@@ -18,11 +104,6 @@ body {
   background-clip: text;
   color: transparent;
   animation: shimmer 2.5s linear infinite;
-}
-
-/* Animated gold border for winner cards */
-.gold-border {
-  position: relative;
 }
 .gold-border::before {
   content: '';
@@ -35,47 +116,33 @@ body {
   z-index: -1;
 }
 
-/* Lightning flash overlay on the results stage */
+/* ── Results page (lightning, sparkle) ─────────────────── */
 .lightning-flash {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 30% 0%, rgba(255, 255, 255, 0.85), transparent 60%);
-  animation: lightning 5s linear infinite;
-  z-index: 5;
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 30% 0%, rgba(255,255,255,0.85), transparent 60%);
+  animation: lightning 5s linear infinite; z-index: 5;
 }
 .lightning-flash.delay {
-  background: radial-gradient(ellipse at 75% 0%, rgba(186, 230, 253, 0.8), transparent 55%);
+  background: radial-gradient(ellipse at 75% 0%, rgba(254,200,150,0.5), transparent 55%);
   animation-delay: 2.3s;
 }
-
-/* Sparkle particles */
 .sparkle {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  pointer-events: none;
-  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  background: #fde68a;
-  animation: sparkle 1.6s ease-in-out infinite;
+  position: absolute; width: 10px; height: 10px; pointer-events: none;
+  clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  background: #fde68a; animation: sparkle 1.6s ease-in-out infinite;
 }
 
-/* Number tick-up */
+/* ── Vote animations ────────────────────────────────────── */
 @keyframes pop {
   0% { transform: scale(1); }
   40% { transform: scale(1.35); color: #16a34a; }
   100% { transform: scale(1); }
 }
-.vote-pop {
-  animation: pop 0.5s ease-out;
-}
+.vote-pop { animation: pop 0.5s ease-out; }
 
-/* Heart burst on vote */
 @keyframes heart-burst {
   0% { transform: scale(0); opacity: 1; }
   70% { transform: scale(1.6); opacity: 0.9; }
   100% { transform: scale(2.4); opacity: 0; }
 }
-.heart-burst {
-  animation: heart-burst 0.7s ease-out forwards;
-}
+.heart-burst { animation: heart-burst 0.7s ease-out forwards; }

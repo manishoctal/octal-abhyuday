@@ -71,6 +71,7 @@ export interface EventInfoItem {
   section: string;
   title: string;
   body: string;
+  maps_url: string | null;
   sort_order: number;
 }
 

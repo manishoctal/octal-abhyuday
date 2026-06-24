@@ -2,15 +2,22 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ChevronLeft, LogOut } from 'lucide-react';
 
 export default function Header({
-  name,
   eventName,
+  title,
+  back,
+  hideBack = false,
   isAdmin = false,
+  name: _name,
 }: {
-  name: string;
   eventName: string;
+  title?: string;
+  back?: string;
+  hideBack?: boolean;
   isAdmin?: boolean;
+  name?: string;
 }) {
   const router = useRouter();
 
@@ -21,27 +28,60 @@ export default function Header({
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
-      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 min-w-0 hover:opacity-80 transition" title="Home">
-          <span className="text-xl">🏆</span>
-          <span className="font-extrabold text-slate-900 truncate">{eventName}</span>
-        </Link>
-        <div className="flex items-center gap-1 sm:gap-2">
+    <header className="sticky top-0 z-40 bg-white/96 backdrop-blur-xl border-b border-slate-100/80">
+      <div
+        className="flex items-center h-14 px-4 gap-3 max-w-lg mx-auto"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        {/* Left — back arrow or wordmark */}
+        {back && !hideBack ? (
           <Link
-            href="/"
-            className="px-3 py-1.5 rounded-full text-sm font-semibold text-slate-600 hover:bg-slate-100 transition"
+            href={back}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-600 shrink-0 active:bg-slate-200 transition-colors"
           >
-            Home
+            <ChevronLeft size={18} strokeWidth={2} />
           </Link>
-          <span className="hidden sm:block text-sm font-semibold text-slate-400 truncate max-w-[140px]">
-            {name}
-          </span>
+        ) : hideBack ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0" style={{ background: '#FE9234' }}>
+              <span className="text-white font-extrabold text-xs leading-none">O</span>
+            </div>
+          </div>
+        ) : (
+          <Link href="/" className="flex items-center gap-2 shrink-0 active:opacity-70 transition-opacity">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0" style={{ background: '#FE9234' }}>
+              <span className="text-white font-extrabold text-xs leading-none">O</span>
+            </div>
+            <span className="font-bold text-slate-900 text-[15px] tracking-tight leading-none">
+              {eventName}
+            </span>
+          </Link>
+        )}
+
+        {/* Center — page title */}
+        {title ? (
+          <span className="flex-1 font-semibold text-slate-900 text-[15px] truncate">{title}</span>
+        ) : (
+          <span className="flex-1" />
+        )}
+
+        {/* Right — admin pill + logout */}
+        <div className="flex items-center gap-2 shrink-0">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="h-7 px-2.5 flex items-center rounded-full text-[11px] font-bold border"
+              style={{ background: '#FFF4E8', color: '#FE9234', borderColor: '#FED098' }}
+            >
+              Admin
+            </Link>
+          )}
           <button
             onClick={logout}
-            className="px-3 py-1.5 rounded-full text-sm font-semibold text-red-600 hover:bg-red-50 transition"
+            aria-label="Logout"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 active:bg-red-50 active:text-red-500 transition-colors"
           >
-            Logout
+            <LogOut size={16} strokeWidth={1.8} />
           </button>
         </div>
       </div>

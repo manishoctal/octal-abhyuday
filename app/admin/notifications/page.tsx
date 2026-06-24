@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import { getAppState } from '@/lib/db';
+import { getAppState, listDepartments } from '@/lib/db';
 import NotificationsModule from '@/components/admin/NotificationsModule';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +21,7 @@ export default async function AdminNotificationsPage() {
           <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">🔔 Push Notifications</h1>
           <p className="text-sm text-slate-500 mt-0.5">Send instant alerts to all attendees' devices.</p>
         </div>
-        <NotificationsModule />
+        <NotificationsModule departments={listDepartments()} />
       </main>
     </>
   );

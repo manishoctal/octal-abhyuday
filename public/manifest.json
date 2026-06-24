@@ -1,11 +1,11 @@
 {
-  "name": "Octal Event",
-  "short_name": "OctalEvent",
-  "description": "Company event app — schedules, voting, Q&A, gallery, and more",
+  "name": "ABHYUDAY — Octal IT Solution",
+  "short_name": "ABHYUDAY",
+  "description": "Octal IT Solution event companion — schedule, voting, Q&A, gallery, and more",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#6366f1",
+  "background_color": "#F8FAFC",
+  "theme_color": "#FE9234",
   "orientation": "portrait",
   "icons": [
     {

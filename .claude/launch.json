@@ -1,12 +1,1 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    {
-      "name": "octal-vote",
-      "cwd": "D:\\Projects\\octal-vote",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
-      "port": 3000
-    }
-  ]
-}
+{"version":"0.0.1","configurations":[{"name":"octal-vote-dev","runtimeExecutable":"pnpm","runtimeArgs":["dev"],"port":3001}]}

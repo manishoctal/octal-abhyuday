@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import { getAppState, listScheduleSessions, getAttendance } from '@/lib/db';
+import BottomNav from '@/components/BottomNav';
+import { getAppState, listScheduleSessions, getAttendance, getUserById } from '@/lib/db';
+import { getLiveSession } from '@/lib/qa';
 import DashboardClient from '@/components/DashboardClient';
 
 export const dynamic = 'force-dynamic';
@@ -10,14 +12,19 @@ export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const appState = getAppState();
-  const schedule = listScheduleSessions();
+  // Gate: profile photo is mandatory before using the app
+  const user = getUserById(session.id);
+  if (!user?.profile_photo_url) redirect('/profile?required=1');
+
+  const appState   = getAppState();
+  const schedule   = listScheduleSessions();
   const attendance = getAttendance(session.id);
+  const liveQa     = getLiveSession();
 
   return (
     <>
-      <Header name={session.name} eventName={appState.event_name} isAdmin={session.isAdmin} />
-      <main className="max-w-2xl mx-auto px-4 pt-4 pb-24">
+      <Header eventName={appState.event_name} isAdmin={session.isAdmin} />
+      <main className="max-w-lg mx-auto px-4 pt-4">
         <DashboardClient
           eventName={appState.event_name}
           schedule={schedule}
@@ -26,8 +33,10 @@ export default async function HomePage() {
           isCheckedIn={!!attendance}
           userId={session.id}
           userName={session.name}
+          liveQa={!!liveQa}
         />
       </main>
+      <BottomNav isAdmin={session.isAdmin} />
     </>
   );
 }

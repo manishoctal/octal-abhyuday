@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Vote } from 'lucide-react';
 import CandidateCard from './CandidateCard';
 import { useRealtime } from './useRealtime';
 import type { CandidateWithVotes, Gender, AppState } from '@/lib/types';
@@ -201,7 +202,7 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
               exit={{ y: 80, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 400, damping: 32 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6 text-center"
+              className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl px-6 pt-6 pb-24 sm:p-6 text-center"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -233,7 +234,7 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
                   disabled={voting}
                   className="flex-1 rounded-xl bg-brand-600 py-3 font-bold text-white hover:bg-brand-700 active:scale-[0.98] disabled:opacity-60"
                 >
-                  {voting ? 'Saving…' : 'Confirm 🗳️'}
+                  {voting ? 'Saving…' : <span className="flex items-center justify-center gap-2"><Vote size={16} strokeWidth={2} />Confirm</span>}
                 </button>
               </div>
             </motion.div>
@@ -248,7 +249,7 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-xl max-w-[92vw] text-center"
+            className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-xl max-w-[92vw] text-center"
           >
             {toast}
           </motion.div>

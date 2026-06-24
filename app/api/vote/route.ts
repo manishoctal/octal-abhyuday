@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAppState, getCandidate, setVote } from '@/lib/db';
+import { getAppState, getCandidate, setVote, awardPoints } from '@/lib/db';
 import { requireUser, isErrorResponse } from '@/lib/api-helpers';
 import { broadcast } from '@/lib/events';
 
@@ -29,6 +29,7 @@ export async function POST(req: Request) {
 
   // Both rounds: one changeable vote per gender
   setVote(session.id, candidate.id, candidate.gender, state.voting_round);
+  awardPoints(session.id, 'voted', 10);
   broadcast('vote');
   return NextResponse.json({ ok: true });
 }

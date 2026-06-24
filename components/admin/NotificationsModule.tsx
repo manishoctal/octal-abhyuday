@@ -11,14 +11,22 @@ const QUICK = [
   { title: '🌙 Event Closing', body: 'Thank you for being part of ABHYUDAY 2026! Safe journey home.' },
 ];
 
-export default function NotificationsModule() {
+type Target = 'all' | 'admins' | 'department';
+
+export default function NotificationsModule({ departments = [] }: { departments?: string[] }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [target, setTarget] = useState<Target>('all');
+  const [department, setDepartment] = useState('');
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
   const [error, setError] = useState('');
 
   async function send(t: string, b: string) {
+    if (target === 'department' && !department) {
+      setError('Please choose a department');
+      return;
+    }
     setSending(true);
     setError('');
     setResult(null);
@@ -26,7 +34,12 @@ export default function NotificationsModule() {
       const res = await fetch('/api/push/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: t, body: b }),
+        body: JSON.stringify({
+          title: t,
+          body: b,
+          target,
+          department: target === 'department' ? department : undefined,
+        }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error ?? 'Failed to send'); return; }
@@ -36,10 +49,55 @@ export default function NotificationsModule() {
     }
   }
 
+  const targets: { id: Target; label: string }[] = [
+    { id: 'all', label: 'Everyone' },
+    { id: 'department', label: 'Department' },
+    { id: 'admins', label: 'Admins only' },
+  ];
+
   const inp = 'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400';
 
   return (
     <div className="space-y-6">
+      {/* Audience target */}
+      <div>
+        <h2 className="text-sm font-bold text-slate-700 mb-3">Send to</h2>
+        <div className="flex gap-2 flex-wrap">
+          {targets.map((tg) => {
+            const active = target === tg.id;
+            return (
+              <button
+                key={tg.id}
+                onClick={() => setTarget(tg.id)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold border transition ${
+                  active ? 'text-white border-transparent' : 'text-slate-600 bg-white border-slate-200 hover:border-brand-300'
+                }`}
+                style={active ? { background: '#FE9234' } : {}}
+              >
+                {tg.label}
+              </button>
+            );
+          })}
+        </div>
+        {target === 'department' && (
+          <select
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            className={`${inp} mt-3`}
+          >
+            <option value="">Choose a department…</option>
+            {departments.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        )}
+        {target === 'department' && departments.length === 0 && (
+          <p className="text-xs text-slate-400 mt-2">
+            No departments set yet — attendees add theirs on the Profile screen.
+          </p>
+        )}
+      </div>
+
       {/* Quick send */}
       <div>
         <h2 className="text-sm font-bold text-slate-700 mb-3">Quick Send</h2>
@@ -74,7 +132,13 @@ export default function NotificationsModule() {
           onClick={() => send(title, body)}
           className="w-full py-2.5 rounded-lg bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 disabled:opacity-50 transition"
         >
-          {sending ? 'Sending…' : '📤 Send to all attendees'}
+          {sending
+            ? 'Sending…'
+            : target === 'admins'
+            ? '📤 Send to admins'
+            : target === 'department'
+            ? `📤 Send to ${department || 'department'}`
+            : '📤 Send to all attendees'}
         </button>
       </div>
 

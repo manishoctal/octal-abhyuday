@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-helpers';
+import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import {
   listScheduleSessions,
   createScheduleSession,
@@ -12,13 +12,13 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const err = await requireAdmin();
-  if (err) return err;
+  if (isErrorResponse(err)) return err;
   return NextResponse.json({ sessions: listScheduleSessions() });
 }
 
 export async function POST(req: Request) {
   const err = await requireAdmin();
-  if (err) return err;
+  if (isErrorResponse(err)) return err;
   const body = await req.json();
   const { action, id, data } = body as {
     action: 'create' | 'update' | 'delete';

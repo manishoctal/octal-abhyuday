@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 
 export default function LoginClient({ eventName }: { eventName: string }) {
   const router = useRouter();
@@ -32,14 +31,9 @@ export default function LoginClient({ eventName }: { eventName: string }) {
         body: JSON.stringify({ email: email.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? 'Something went wrong');
-        return;
-      }
+      if (!res.ok) { setError(data.error ?? 'Something went wrong'); return; }
       setStep('otp');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   function handleOtpChange(i: number, value: string) {
@@ -51,19 +45,14 @@ export default function LoginClient({ eventName }: { eventName: string }) {
   }
 
   function handleOtpKeyDown(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace' && !otp[i] && i > 0) {
-      otpRefs.current[i - 1]?.focus();
-    }
+    if (e.key === 'Backspace' && !otp[i] && i > 0) otpRefs.current[i - 1]?.focus();
   }
 
   async function submitOtp(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     const code = otp.join('');
-    if (code.length < 4) {
-      setError('Enter the 4-digit OTP');
-      return;
-    }
+    if (code.length < 4) { setError('Enter the 4-digit OTP'); return; }
     setLoading(true);
     try {
       const res = await fetch('/api/auth/verify-otp', {
@@ -80,127 +69,112 @@ export default function LoginClient({ eventName }: { eventName: string }) {
       }
       router.replace(data.isAdmin ? '/admin' : '/');
       router.refresh();
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   return (
-    <main className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-brand-700 via-brand-600 to-indigo-900 px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
-        <div className="text-center mb-8">
-          <motion.div
-            animate={{ rotate: [0, -8, 8, 0] }}
-            transition={{ repeat: Infinity, duration: 4, repeatDelay: 2 }}
-            className="text-6xl mb-3"
-          >
-            🏆
-          </motion.div>
-          <h1 className="text-3xl font-extrabold text-white">{eventName}</h1>
-          <p className="text-brand-100 mt-1">Most Popular Male & Female</p>
+    <main
+      className="min-h-dvh flex flex-col items-center justify-center px-5 py-10"
+      style={{ background: '#F8FAFC' }}
+    >
+      {/* Wordmark / hero */}
+      <div className="w-full max-w-sm text-center mb-8">
+        {/* Octal logo mark */}
+        <div
+          className="w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-brand-sm"
+          style={{ background: '#FE9234' }}
+        >
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+            <text x="3" y="23" fontSize="22" fontWeight="800" fill="white" fontFamily="system-ui">O</text>
+          </svg>
         </div>
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Octal IT Solution</p>
+        <h1 className="text-3xl font-bold text-slate-900 mt-1 tracking-tight">{eventName}</h1>
+        <p className="text-slate-400 text-sm mt-1.5">Sign in with your work email</p>
+      </div>
 
-        <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8">
-          {step === 'email' ? (
-              <motion.form
-                key="email"
-                initial={{ opacity: 0, x: -24 }}
-                animate={{ opacity: 1, x: 0 }}
-                onSubmit={submitEmail}
-                className="space-y-4"
-              >
-                <div>
-                  <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Official Email
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    placeholder="you@octalsoftware.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                    required
-                  />
-                  <p className="text-xs text-slate-500 mt-1.5">
-                    Only @octalsoftware.com emails can sign in
-                  </p>
-                </div>
-                {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full rounded-xl bg-brand-600 py-3 text-white font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition disabled:opacity-60"
-                >
-                  {loading ? 'Sending…' : 'Send OTP'}
-                </button>
-              </motion.form>
-            ) : (
-              <motion.form
-                key="otp"
-                initial={{ opacity: 0, x: 24 }}
-                animate={{ opacity: 1, x: 0 }}
-                onSubmit={submitOtp}
-                className="space-y-5"
-              >
-                <div className="text-center">
-                  <p className="text-sm text-slate-600">
-                    Enter the 4-digit OTP sent to
-                    <br />
-                    <span className="font-semibold text-slate-900">{email}</span>
-                  </p>
-                </div>
-                <div className="flex justify-center gap-3">
-                  {otp.map((digit, i) => (
-                    <input
-                      key={i}
-                      ref={(el) => {
-                        otpRefs.current[i] = el;
-                      }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(i, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                      aria-label={`OTP digit ${i + 1}`}
-                      className="w-14 h-14 text-center text-2xl font-bold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                    />
-                  ))}
-                </div>
-                {error && <p className="text-sm text-red-600 font-medium text-center">{error}</p>}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full rounded-xl bg-brand-600 py-3 text-white font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition disabled:opacity-60"
-                >
-                  {loading ? 'Verifying…' : 'Verify & Sign In'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep('email');
-                    setOtp(['', '', '', '']);
-                    setError('');
-                  }}
-                  className="w-full text-sm text-slate-500 hover:text-slate-700"
-                >
-                  ← Change email
-                </button>
-              </motion.form>
+      {/* Card */}
+      <div className="card w-full max-w-sm p-6">
+        {step === 'email' ? (
+          <form onSubmit={submitEmail} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Work Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="you@octalsoftware.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="input"
+                required
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">Only @octalsoftware.com emails allowed</p>
+            </div>
+            {error && (
+              <div className="bg-red-50 text-red-600 text-sm font-medium px-4 py-2.5 rounded-xl">{error}</div>
             )}
-        </div>
+            <button type="submit" disabled={loading} className="btn-primary">
+              {loading ? 'Sending OTP…' : 'Continue'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={submitOtp} className="space-y-5">
+            <div className="text-center">
+              <p className="text-sm text-slate-500">
+                Enter the 4-digit OTP sent to
+              </p>
+              <p className="font-semibold text-slate-900 mt-0.5">{email}</p>
+            </div>
 
-        <p className="text-center text-xs text-brand-200 mt-6">
-          Octal IT Solutions · Internal voting platform
-        </p>
-      </motion.div>
+            {/* OTP inputs */}
+            <div className="flex justify-center gap-3">
+              {otp.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={el => { otpRefs.current[i] = el; }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={e => handleOtpChange(i, e.target.value)}
+                  onKeyDown={e => handleOtpKeyDown(i, e)}
+                  aria-label={`OTP digit ${i + 1}`}
+                  className="w-14 h-14 text-center text-2xl font-bold rounded-2xl border-2 outline-none transition-colors"
+                  style={{
+                    borderColor: digit ? '#FE9234' : '#E2E8F0',
+                    background: digit ? '#FFF4E8' : '#F8FAFC',
+                    color: '#0F172A',
+                  }}
+                />
+              ))}
+            </div>
+
+            {error && (
+              <div className="bg-red-50 text-red-600 text-sm font-medium px-4 py-2.5 rounded-xl text-center">{error}</div>
+            )}
+
+            <button type="submit" disabled={loading} className="btn-primary">
+              {loading ? 'Verifying…' : 'Sign In'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setStep('email'); setOtp(['', '', '', '']); setError(''); }}
+              className="w-full text-sm text-slate-400 hover:text-slate-600 transition-colors py-1"
+            >
+              ← Change email
+            </button>
+          </form>
+        )}
+      </div>
+
+      <p className="text-[11px] text-slate-400 mt-8 text-center">
+        Octal IT Solution LLP · Internal Event Platform
+      </p>
     </main>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireUser, isErrorResponse } from '@/lib/api-helpers';
-import { checkIn, getAttendance, listAttendance } from '@/lib/db';
+import { checkIn, getAttendance, listAttendance, awardPoints } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,5 +35,6 @@ export async function POST(req: Request) {
   const { userId } = await req.json();
   if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
   const result = checkIn(Number(userId));
+  if (result.changes > 0) awardPoints(Number(userId), 'check_in', 15);
   return NextResponse.json({ ok: true, alreadyCheckedIn: result.changes === 0 });
 }

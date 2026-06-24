@@ -419,18 +419,30 @@ export interface EventInfoItem {
   section: string;
   title: string;
   body: string;
+  maps_url: string | null;
   sort_order: number;
+}
+
+// Inline migration: add maps_url if the column doesn't exist yet
+const eventInfoCols = (db.prepare('PRAGMA table_info(event_info)').all() as { name: string }[]).map(c => c.name);
+if (!eventInfoCols.includes('maps_url')) {
+  db.exec('ALTER TABLE event_info ADD COLUMN maps_url TEXT');
 }
 
 export function listEventInfo(): EventInfoItem[] {
   return db.prepare('SELECT * FROM event_info ORDER BY section ASC, sort_order ASC').all() as EventInfoItem[];
 }
 
-export function upsertEventInfo(id: number | null, section: string, title: string, body: string, sortOrder: number) {
+export function upsertEventInfo(
+  id: number | null, section: string, title: string, body: string,
+  sortOrder: number, mapsUrl: string | null = null
+) {
   if (id) {
-    db.prepare('UPDATE event_info SET section=?, title=?, body=?, sort_order=? WHERE id=?').run(section, title, body, sortOrder, id);
+    db.prepare('UPDATE event_info SET section=?, title=?, body=?, sort_order=?, maps_url=? WHERE id=?')
+      .run(section, title, body, sortOrder, mapsUrl, id);
   } else {
-    db.prepare('INSERT INTO event_info (section, title, body, sort_order) VALUES (?, ?, ?, ?)').run(section, title, body, sortOrder);
+    db.prepare('INSERT INTO event_info (section, title, body, sort_order, maps_url) VALUES (?, ?, ?, ?, ?)')
+      .run(section, title, body, sortOrder, mapsUrl);
   }
 }
 
@@ -478,6 +490,24 @@ export function getAllPushSubscriptions() {
     { id: number; user_id: number; platform: string; subscription: string }[];
 }
 
+/** Subscriptions joined with the owning user — used for targeted sends. */
+export function getPushSubscriptionsWithUser() {
+  return db.prepare(
+    `SELECT ps.id, ps.user_id, ps.platform, ps.subscription, u.email, u.name, u.department
+     FROM push_subscriptions ps JOIN users u ON u.id = ps.user_id`
+  ).all() as {
+    id: number; user_id: number; platform: string; subscription: string;
+    email: string; name: string; department: string | null;
+  }[];
+}
+
+/** Distinct, non-empty department names — for the notification targeting dropdown. */
+export function listDepartments(): string[] {
+  return (db.prepare(
+    `SELECT DISTINCT department FROM users WHERE department IS NOT NULL AND department != '' ORDER BY department ASC`
+  ).all() as { department: string }[]).map((r) => r.department);
+}
+
 /** Vote-based promotion: the admin chooses how many advance per gender.
  *  Ties at the cutoff are included (when the cutoff has actual votes). */
 export function promoteTopByVotes(
@@ -494,4 +524,191 @@ export function promoteTopByVotes(
   const female = pick('female', femaleCount);
   promoteFinalists([...male, ...female].map((c) => c.id));
   return { male, female };
+}
+
+// ═══════════════════════════════════════════════════════
+//  PHASE 2 TABLES & FUNCTIONS
+// ═══════════════════════════════════════════════════════
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS award_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS award_nominees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL REFERENCES award_categories(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    department TEXT,
+    image_url TEXT
+  );
+  CREATE TABLE IF NOT EXISTS award_winners (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL REFERENCES award_categories(id) ON DELETE CASCADE,
+    nominee_id INTEGER NOT NULL REFERENCES award_nominees(id) ON DELETE CASCADE,
+    announced_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(category_id)
+  );
+  CREATE TABLE IF NOT EXISTS photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uploader_id INTEGER NOT NULL REFERENCES users(id),
+    uploader_name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    caption TEXT,
+    session_tag TEXT,
+    approved INTEGER NOT NULL DEFAULT 0,
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+    overall_rating INTEGER NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
+    session_ratings TEXT NOT NULL DEFAULT '{}',
+    food_rating INTEGER CHECK (food_rating BETWEEN 1 AND 5),
+    venue_rating INTEGER CHECK (venue_rating BETWEEN 1 AND 5),
+    suggestions TEXT,
+    submitted_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    activity TEXT NOT NULL,
+    pts INTEGER NOT NULL DEFAULT 0,
+    earned_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// ---------- awards ----------
+
+export interface AwardCategory {
+  id: number; name: string; description: string | null; sort_order: number; created_at: string;
+  winner?: AwardNominee;
+  nominees?: AwardNominee[];
+}
+export interface AwardNominee {
+  id: number; category_id: number; name: string; department: string | null; image_url: string | null;
+}
+
+export function listAwardCategories(): AwardCategory[] {
+  const cats = db.prepare('SELECT * FROM award_categories ORDER BY sort_order ASC, id ASC').all() as AwardCategory[];
+  const nominees = db.prepare('SELECT * FROM award_nominees').all() as AwardNominee[];
+  const winners = db.prepare(
+    'SELECT w.category_id, n.* FROM award_winners w JOIN award_nominees n ON n.id = w.nominee_id'
+  ).all() as (AwardNominee & { category_id: number })[];
+  return cats.map(c => ({
+    ...c,
+    nominees: nominees.filter(n => n.category_id === c.id),
+    winner: winners.find(w => w.category_id === c.id),
+  }));
+}
+
+export function createAwardCategory(name: string, description: string | null, sortOrder: number) {
+  const r = db.prepare('INSERT INTO award_categories (name, description, sort_order) VALUES (?, ?, ?)').run(name, description, sortOrder);
+  return r.lastInsertRowid as number;
+}
+export function updateAwardCategory(id: number, name: string, description: string | null) {
+  db.prepare('UPDATE award_categories SET name=?, description=? WHERE id=?').run(name, description, id);
+}
+export function deleteAwardCategory(id: number) {
+  db.prepare('DELETE FROM award_categories WHERE id=?').run(id);
+}
+export function createAwardNominee(categoryId: number, name: string, department: string | null, imageUrl: string | null) {
+  db.prepare('INSERT INTO award_nominees (category_id, name, department, image_url) VALUES (?,?,?,?)').run(categoryId, name, department, imageUrl);
+}
+export function deleteAwardNominee(id: number) {
+  db.prepare('DELETE FROM award_nominees WHERE id=?').run(id);
+}
+export function announceWinner(categoryId: number, nomineeId: number) {
+  db.prepare(
+    'INSERT INTO award_winners (category_id, nominee_id) VALUES (?,?) ON CONFLICT(category_id) DO UPDATE SET nominee_id=excluded.nominee_id, announced_at=datetime("now")'
+  ).run(categoryId, nomineeId);
+}
+export function clearWinner(categoryId: number) {
+  db.prepare('DELETE FROM award_winners WHERE category_id=?').run(categoryId);
+}
+
+// ---------- photos ----------
+
+export interface Photo {
+  id: number; uploader_id: number; uploader_name: string; url: string;
+  caption: string | null; session_tag: string | null; approved: number; uploaded_at: string;
+}
+
+export function listPhotos(approvedOnly = true): Photo[] {
+  return db.prepare(
+    approvedOnly
+      ? 'SELECT * FROM photos WHERE approved=1 ORDER BY uploaded_at DESC'
+      : 'SELECT * FROM photos ORDER BY approved ASC, uploaded_at DESC'
+  ).all() as Photo[];
+}
+/** All photos by a specific user (approved=1, pending=0, rejected=-1). */
+export function listUserPhotos(userId: number): Photo[] {
+  return db.prepare('SELECT * FROM photos WHERE uploader_id=? ORDER BY uploaded_at DESC').all(userId) as Photo[];
+}
+export function addPhoto(uploaderId: number, uploaderName: string, url: string, caption: string | null, sessionTag: string | null) {
+  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag) VALUES (?,?,?,?,?)').run(uploaderId, uploaderName, url, caption, sessionTag);
+  return r.lastInsertRowid as number;
+}
+export function approvePhoto(id: number) {
+  db.prepare('UPDATE photos SET approved=1 WHERE id=?').run(id);
+}
+export function rejectPhoto(id: number) {
+  // approved=-1 keeps the record visible to the uploader with "Rejected" status
+  db.prepare('UPDATE photos SET approved=-1 WHERE id=?').run(id);
+}
+
+// ---------- feedback ----------
+
+export interface FeedbackRow {
+  id: number; user_id: number; overall_rating: number; session_ratings: string;
+  food_rating: number | null; venue_rating: number | null; suggestions: string | null; submitted_at: string;
+}
+
+export function getFeedback(userId: number): FeedbackRow | undefined {
+  return db.prepare('SELECT * FROM feedback WHERE user_id=?').get(userId) as FeedbackRow | undefined;
+}
+export function upsertFeedback(userId: number, overall: number, sessionRatings: Record<string, number>, food: number | null, venue: number | null, suggestions: string | null) {
+  db.prepare(
+    `INSERT INTO feedback (user_id, overall_rating, session_ratings, food_rating, venue_rating, suggestions)
+     VALUES (?,?,?,?,?,?)
+     ON CONFLICT(user_id) DO UPDATE SET overall_rating=excluded.overall_rating,
+       session_ratings=excluded.session_ratings, food_rating=excluded.food_rating,
+       venue_rating=excluded.venue_rating, suggestions=excluded.suggestions,
+       submitted_at=datetime('now')`
+  ).run(userId, overall, JSON.stringify(sessionRatings), food, venue, suggestions);
+  awardPoints(userId, 'feedback', 20);
+}
+export function listFeedback() {
+  return db.prepare(
+    'SELECT f.*, u.name, u.email FROM feedback f JOIN users u ON u.id=f.user_id ORDER BY f.submitted_at DESC'
+  ).all() as (FeedbackRow & { name: string; email: string })[];
+}
+
+// ---------- points / gamification ----------
+
+export function awardPoints(userId: number, activity: string, pts: number) {
+  const existing = db.prepare('SELECT id FROM points WHERE user_id=? AND activity=?').get(userId, activity);
+  if (!existing) {
+    db.prepare('INSERT INTO points (user_id, activity, pts) VALUES (?,?,?)').run(userId, activity, pts);
+  }
+}
+
+export interface LeaderboardRow { user_id: number; name: string; email: string; total: number; activities: string }
+
+export function getLeaderboard(limit = 20): LeaderboardRow[] {
+  return db.prepare(
+    `SELECT p.user_id, u.name, u.email,
+            SUM(p.pts) AS total,
+            GROUP_CONCAT(p.activity, ',') AS activities
+     FROM points p JOIN users u ON u.id=p.user_id
+     GROUP BY p.user_id ORDER BY total DESC LIMIT ?`
+  ).all(limit) as LeaderboardRow[];
+}
+
+export function getUserPoints(userId: number): number {
+  const r = db.prepare('SELECT SUM(pts) AS total FROM points WHERE user_id=?').get(userId) as { total: number | null };
+  return r.total ?? 0;
 }
