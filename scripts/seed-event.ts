@@ -5,11 +5,7 @@
  * Run: pnpm tsx scripts/seed-event.ts
  */
 
-import Database from 'better-sqlite3';
-import path from 'path';
-
-const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), 'data');
-const db = new Database(path.join(DATA_DIR, 'vote.db'));
+import { db } from '../lib/db';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
