@@ -61,9 +61,35 @@ function createDb(): Database.Database {
   return db;
 }
 
+// During `pnpm build` Next.js runs every server component once ("Collecting page data").
+// Skip real DB init in that phase — the filesystem path isn't guaranteed during build.
+// At runtime (pnpm start / pm2) NEXT_PHASE is unset, so we always use the real DB.
+const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+
+function makeBuildStub(): Database.Database {
+  const stmt = () => ({
+    get: () => undefined,
+    all: () => [] as never[],
+    run: () => ({ changes: 0, lastInsertRowid: 0 }),
+    iterate: function* () {},
+  });
+  return new Proxy({} as Database.Database, {
+    get: (_t, prop) => {
+      const p = String(prop);
+      if (p === 'prepare') return stmt;
+      if (['exec', 'pragma', 'close', 'serialize'].includes(p)) return () => undefined;
+      // transaction(fn) must return a callable so callers can do: const t = db.transaction(fn); t();
+      if (p === 'transaction') return (fn: (...a: unknown[]) => unknown) => fn;
+      return undefined;
+    },
+  });
+}
+
 // Reuse the connection across Next.js dev hot-reloads
-export const db: Database.Database = globalThis.__octalVoteDb ?? createDb();
-globalThis.__octalVoteDb = db;
+export const db: Database.Database = isBuildPhase
+  ? makeBuildStub()
+  : (globalThis.__octalVoteDb ?? createDb());
+if (!isBuildPhase) globalThis.__octalVoteDb = db;
 
 // ---------- migrations (run on every module load; cheap and idempotent) ----------
 
