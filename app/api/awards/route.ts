@@ -6,6 +6,7 @@ import {
   createAwardNominee, deleteAwardNominee,
   announceWinner, clearWinner,
 } from '@/lib/db';
+import { broadcast } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,10 +44,12 @@ export async function POST(req: Request) {
   }
   if (action === 'announce_winner') {
     announceWinner(body.category_id, body.nominee_id);
+    broadcast('state');
     return NextResponse.json({ ok: true });
   }
   if (action === 'clear_winner') {
     clearWinner(body.category_id);
+    broadcast('state');
     return NextResponse.json({ ok: true });
   }
 

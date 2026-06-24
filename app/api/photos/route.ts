@@ -11,16 +11,20 @@ const MAX_FILES = 10;
 const JPEG_VARIANTS = new Set(['jfif', 'jpe', 'jif', 'jfi', 'jpeg']);
 
 export async function GET(req: Request) {
-  const userOrErr = await requireUser();
-  if (isErrorResponse(userOrErr)) return userOrErr;
   const url  = new URL(req.url);
   const all  = url.searchParams.get('all')  === '1';
   const mine = url.searchParams.get('mine') === '1';
 
-  let photos;
-  if (all)       photos = listPhotos(false);
-  else if (mine) photos = listUserPhotos(userOrErr.id);
-  else           photos = listPhotos(true);
+  if (all) {
+    const adminOrErr = await requireAdmin();
+    if (isErrorResponse(adminOrErr)) return adminOrErr;
+    return NextResponse.json({ photos: listPhotos(false) });
+  }
+
+  const userOrErr = await requireUser();
+  if (isErrorResponse(userOrErr)) return userOrErr;
+
+  const photos = mine ? listUserPhotos(userOrErr.id) : listPhotos(true);
   return NextResponse.json({ photos });
 }
 
@@ -35,6 +39,12 @@ export async function POST(req: Request) {
     const { urls } = await req.json() as { urls: string[] };
     if (!urls?.length) return NextResponse.json({ error: 'No URLs provided' }, { status: 400 });
     if (urls.length > MAX_FILES) return NextResponse.json({ error: `Max ${MAX_FILES} files` }, { status: 400 });
+
+    const s3Base = (process.env.S3_PUBLIC_URL ?? '').replace(/\/$/, '');
+    if (s3Base) {
+      const bad = urls.find(u => !u.startsWith(s3Base));
+      if (bad) return NextResponse.json({ error: 'Invalid photo URL' }, { status: 400 });
+    }
 
     const results = urls.map(url => ({
       id: addPhoto(userOrErr.id, userOrErr.name, url, null, null),
@@ -74,7 +84,9 @@ export async function PATCH(req: Request) {
   const adminOrErr = await requireAdmin();
   if (isErrorResponse(adminOrErr)) return adminOrErr;
   const { id, action } = await req.json();
+  if (typeof id !== 'number') return NextResponse.json({ error: 'id required' }, { status: 400 });
   if (action === 'approve') approvePhoto(id);
   else if (action === 'reject') rejectPhoto(id);
+  else return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   return NextResponse.json({ ok: true });
 }

@@ -32,6 +32,9 @@ importers:
       '@capacitor/push-notifications':
         specifier: ^6.0.4
         version: 6.0.5(@capacitor/core@6.2.1)
+      '@capacitor/splash-screen':
+        specifier: ^6.0.4
+        version: 6.0.4(@capacitor/core@6.2.1)
       '@zxing/browser':
         specifier: ^0.2.0
         version: 0.2.0(@zxing/library@0.23.0)
@@ -765,6 +768,11 @@ packages:
 
   '@capacitor/push-notifications@6.0.5':
     resolution: {integrity: sha512-CsRmb0cnZd9Uwx24ym4My5fNKrQvwI4D51aMEph5pUZy+LAjp6q0y4NJe8DEgwaVdAqVLbb4rqn75AZ4WSiFYg==}
+    peerDependencies:
+      '@capacitor/core': ^6.0.0
+
+  '@capacitor/splash-screen@6.0.4':
+    resolution: {integrity: sha512-uJXR+28cdaie7zIIUBvgkWgHim6Gr1itJym9voIMTmrjXkOaPtejwxYJsdQWPJz9zgGnSbXuC1mNNibLgv3OpQ==}
     peerDependencies:
       '@capacitor/core': ^6.0.0
 
@@ -4201,6 +4209,10 @@ snapshots:
       '@capacitor/core': 6.2.1
 
   '@capacitor/push-notifications@6.0.5(@capacitor/core@6.2.1)':
+    dependencies:
+      '@capacitor/core': 6.2.1
+
+  '@capacitor/splash-screen@6.0.4(@capacitor/core@6.2.1)':
     dependencies:
       '@capacitor/core': 6.2.1
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { getAppState } from '@/lib/db';
+import SplashHider from '@/components/SplashHider';
 import './globals.css';
 
 export function generateMetadata(): Metadata {
@@ -21,9 +22,19 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const eventName = getAppState().event_name;
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {/* Web splash — shown on initial load, React hides it after hydration */}
+        <div id="web-splash" aria-hidden="true">
+          <div className="splash-logo">O</div>
+          <div className="splash-name">{eventName}</div>
+          <div className="splash-by">Octal IT Solutions</div>
+        </div>
+        <SplashHider />
+        {children}
+      </body>
     </html>
   );
 }

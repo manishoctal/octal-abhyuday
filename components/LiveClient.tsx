@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import useSWR from 'swr';
 import { Vote, MessageSquare, BarChart3, Zap, ArrowRight } from 'lucide-react';
-import { useRealtime } from './useRealtime';
 
 const fetcher = (u: string) => fetch(u).then(r => r.json());
 
@@ -81,9 +80,8 @@ function buildItems(data: LiveData): LiveItem[] {
 export default function LiveClient({ initial }: { initial: LiveData }) {
   const { data } = useSWR<LiveData>('/api/live', fetcher, {
     fallbackData: initial,
-    refreshInterval: 15000,
+    refreshInterval: 8000,
   });
-  useRealtime(['/api/live']);
 
   const liveData = data ?? initial;
   const items    = buildItems(liveData);

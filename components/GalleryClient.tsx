@@ -190,6 +190,7 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
   const [fileProgresses, setFileProgresses] = useState<FileProgress[]>([]);
   const uploading                           = fileProgresses.length > 0 && !done;
   const inputRef                            = useRef<HTMLInputElement>(null);
+  const cameraRef                           = useRef<HTMLInputElement>(null);
 
   function pickFiles(raw: FileList | null) {
     if (!raw) return;
@@ -385,20 +386,31 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
 
           {/* ── Pre-upload: drop zone ── */}
           {!uploading && files.length === 0 && (
-            <button onClick={() => inputRef.current?.click()}
-              className="w-full border-2 border-dashed rounded-3xl py-12 flex flex-col items-center gap-3 active:scale-[0.99] transition-transform"
-              style={{ borderColor: '#FE9234' }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#FFF4E8' }}>
-                <ImagePlus size={32} strokeWidth={1.6} color="#FE9234" />
+            <div className="space-y-3">
+              {/* Camera capture button */}
+              <button onClick={() => cameraRef.current?.click()}
+                className="w-full border-2 rounded-3xl py-5 flex items-center justify-center gap-3 active:scale-[0.99] transition-transform"
+                style={{ borderColor: '#FE9234', background: '#FFF4E8' }}>
+                <Camera size={22} strokeWidth={1.8} color="#FE9234" />
+                <span className="font-semibold text-[15px]" style={{ color: '#FE9234' }}>Take a Photo</span>
+              </button>
+
+              {/* Gallery picker */}
+              <button onClick={() => inputRef.current?.click()}
+                className="w-full border-2 border-dashed rounded-3xl py-10 flex flex-col items-center gap-3 active:scale-[0.99] transition-transform"
+                style={{ borderColor: '#CBD5E1' }}>
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#F8FAFC' }}>
+                <ImagePlus size={32} strokeWidth={1.6} className="text-slate-400" />
               </div>
               <div className="text-center">
-                <p className="font-semibold text-slate-800 text-[15px]">Tap to select photos</p>
+                <p className="font-semibold text-slate-700 text-[15px]">Choose from Gallery</p>
                 <p className="text-xs text-slate-400 mt-1">JPEG, PNG, HEIC · max 5 MB each</p>
               </div>
               <span className="px-5 py-2 rounded-full text-sm font-semibold text-white" style={{ background: '#FE9234' }}>
-                Choose Photos
+                Browse Photos
               </span>
             </button>
+            </div>
           )}
 
           {/* ── Pre-upload: file grid ── */}
@@ -426,6 +438,9 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
           )}
 
           <input ref={inputRef} type="file" accept="image/*,.jfif,.jpe,.jif,.jfi" multiple className="hidden"
+            onChange={e => pickFiles(e.target.files)} />
+          {/* Camera capture — opens native camera directly */}
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
             onChange={e => pickFiles(e.target.files)} />
 
           {error && (

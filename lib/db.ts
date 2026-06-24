@@ -180,6 +180,11 @@ export function setSetting(key: string, value: string) {
   ).run(key, value);
 }
 
+export function getSetting(key: string): string | null {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
 // ---------- candidates ----------
 
 export interface ListOptions {
@@ -611,9 +616,15 @@ db.exec(`
     user_id INTEGER NOT NULL REFERENCES users(id),
     activity TEXT NOT NULL,
     pts INTEGER NOT NULL DEFAULT 0,
-    earned_at TEXT NOT NULL DEFAULT (datetime('now'))
+    earned_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, activity)
   );
 `);
+
+// Idempotent migration: add UNIQUE index if the table predates this constraint
+try {
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_points_user_activity ON points(user_id, activity)');
+} catch { /* duplicates already exist — safe to ignore, INSERT OR IGNORE will handle dedup */ }
 
 // ---------- awards ----------
 
@@ -684,6 +695,7 @@ export function listUserPhotos(userId: number): Photo[] {
 }
 export function addPhoto(uploaderId: number, uploaderName: string, url: string, caption: string | null, sessionTag: string | null) {
   const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag) VALUES (?,?,?,?,?)').run(uploaderId, uploaderName, url, caption, sessionTag);
+  awardPoints(uploaderId, 'uploaded_photo', 15);
   return r.lastInsertRowid as number;
 }
 export function approvePhoto(id: number) {
@@ -724,10 +736,7 @@ export function listFeedback() {
 // ---------- points / gamification ----------
 
 export function awardPoints(userId: number, activity: string, pts: number) {
-  const existing = db.prepare('SELECT id FROM points WHERE user_id=? AND activity=?').get(userId, activity);
-  if (!existing) {
-    db.prepare('INSERT INTO points (user_id, activity, pts) VALUES (?,?,?)').run(userId, activity, pts);
-  }
+  db.prepare('INSERT OR IGNORE INTO points (user_id, activity, pts) VALUES (?,?,?)').run(userId, activity, pts);
 }
 
 export interface LeaderboardRow { user_id: number; name: string; email: string; total: number; activities: string }
@@ -736,7 +745,7 @@ export function getLeaderboard(limit = 20): LeaderboardRow[] {
   return db.prepare(
     `SELECT p.user_id, u.name, u.email,
             SUM(p.pts) AS total,
-            GROUP_CONCAT(p.activity, ',') AS activities
+            GROUP_CONCAT(p.activity, ',') AS activities  /* unique per user due to UNIQUE(user_id,activity) */
      FROM points p JOIN users u ON u.id=p.user_id
      GROUP BY p.user_id ORDER BY total DESC LIMIT ?`
   ).all(limit) as LeaderboardRow[];

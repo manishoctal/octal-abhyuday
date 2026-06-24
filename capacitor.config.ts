@@ -11,7 +11,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  *
  * Override the URL per-environment with CAPACITOR_SERVER_URL (e.g. a staging host).
  */
-const serverUrl = process.env.CAPACITOR_SERVER_URL || 'https://octal-vote.onrender.com';
+const serverUrl = process.env.CAPACITOR_SERVER_URL || 'https://abhyuday.octallabs.com';
 
 const config: CapacitorConfig = {
   appId: 'com.octalsoftware.abhyuday',
@@ -31,6 +31,16 @@ const config: CapacitorConfig = {
   plugins: {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
+    },
+    SplashScreen: {
+      launchShowDuration: 2200,
+      launchAutoHide: true,
+      backgroundColor: '#0F172A',
+      androidSplashResourceName: 'splash',
+      androidScaleType: 'CENTER_CROP',
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: true,
     },
   },
 };
