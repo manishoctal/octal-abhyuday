@@ -5,24 +5,29 @@ import webpush from 'web-push';
 
 export const dynamic = 'force-dynamic';
 
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    `mailto:${process.env.VAPID_CONTACT_EMAIL ?? 'admin@octalsoftware.com'}`,
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-}
-
 const adminEmails = (process.env.ADMIN_EMAILS ?? '')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
+let vapidReady = false;
+function initVapid(): boolean {
+  if (vapidReady) return true;
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return false;
+  webpush.setVapidDetails(
+    `mailto:${process.env.VAPID_CONTACT_EMAIL ?? 'admin@octalsoftware.com'}`,
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+  vapidReady = true;
+  return true;
+}
+
 export async function POST(req: Request) {
   const err = await requireAdmin();
   if (isErrorResponse(err)) return err;
 
-  if (!process.env.VAPID_PUBLIC_KEY) {
+  if (!initVapid()) {
     return NextResponse.json({ error: 'VAPID keys not configured' }, { status: 503 });
   }
 
