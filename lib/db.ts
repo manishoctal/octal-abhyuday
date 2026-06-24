@@ -17,7 +17,15 @@ declare global {
 }
 
 function createDb(): Database.Database {
-  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+  } catch (e) {
+    throw new Error(
+      `Cannot create database directory "${DB_DIR}". ` +
+      `Set DATA_DIR env var to a writable path (e.g. DATA_DIR=/var/data). ` +
+      `Original: ${e}`,
+    );
+  }
   const db = new Database(DB_PATH);
   db.pragma('journal_mode = WAL');
   db.exec(`
