@@ -640,6 +640,19 @@ db.exec(`
     approved INTEGER NOT NULL DEFAULT 0,
     uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS photo_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    photo_id INTEGER NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    confidence REAL NOT NULL DEFAULT 0,
+    tagged_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(photo_id, employee_id)
+  );
+  CREATE TABLE IF NOT EXISTS face_embeddings (
+    employee_id INTEGER PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
+    embedding TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
   CREATE TABLE IF NOT EXISTS feedback (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
@@ -714,11 +727,63 @@ export function clearWinner(categoryId: number) {
   db.prepare('DELETE FROM award_winners WHERE category_id=?').run(categoryId);
 }
 
+// ---------- face embeddings ----------
+
+export function saveFaceEmbedding(employeeId: number, embedding: number[]) {
+  db.prepare(
+    `INSERT INTO face_embeddings (employee_id, embedding, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(employee_id) DO UPDATE SET embedding = excluded.embedding, updated_at = excluded.updated_at`
+  ).run(employeeId, JSON.stringify(embedding));
+}
+
+export function getFaceEmbedding(employeeId: number): number[] | null {
+  const row = db.prepare('SELECT embedding FROM face_embeddings WHERE employee_id = ?').get(employeeId) as { embedding: string } | undefined;
+  return row ? JSON.parse(row.embedding) : null;
+}
+
+export function getAllFaceEmbeddings(): { employee_id: number; embedding: number[] }[] {
+  return (db.prepare('SELECT employee_id, embedding FROM face_embeddings').all() as { employee_id: number; embedding: string }[])
+    .map(r => ({ employee_id: r.employee_id, embedding: JSON.parse(r.embedding) }));
+}
+
+export function deleteFaceEmbedding(employeeId: number) {
+  db.prepare('DELETE FROM face_embeddings WHERE employee_id = ?').run(employeeId);
+}
+
+// ---------- photo tags ----------
+
+export function addPhotoTag(photoId: number, employeeId: number, confidence: number) {
+  db.prepare(
+    'INSERT OR IGNORE INTO photo_tags (photo_id, employee_id, confidence) VALUES (?, ?, ?)'
+  ).run(photoId, employeeId, confidence);
+}
+
+export function getPhotosByEmployeeId(employeeId: number): Photo[] {
+  return db.prepare(
+    `SELECT p.* FROM photos p
+     JOIN photo_tags pt ON pt.photo_id = p.id
+     WHERE pt.employee_id = ? AND p.approved = 1
+     ORDER BY p.uploaded_at DESC`
+  ).all(employeeId) as Photo[];
+}
+
+export function getTagsForPhoto(photoId: number) {
+  return db.prepare(
+    `SELECT pt.employee_id, pt.confidence, e.name, e.employee_code
+     FROM photo_tags pt JOIN employees e ON e.id = pt.employee_id
+     WHERE pt.photo_id = ?`
+  ).all(photoId) as { employee_id: number; confidence: number; name: string; employee_code: string }[];
+}
+
 // ---------- photos ----------
 
 export interface Photo {
   id: number; uploader_id: number; uploader_name: string; url: string;
   caption: string | null; session_tag: string | null; approved: number; uploaded_at: string;
+}
+
+export function getPhotoById(id: number): Photo | undefined {
+  return db.prepare('SELECT * FROM photos WHERE id = ?').get(id) as Photo | undefined;
 }
 
 export function listPhotos(approvedOnly = true): Photo[] {
@@ -868,6 +933,10 @@ export interface Employee {
 
 export function listEmployees(): Employee[] {
   return db.prepare('SELECT * FROM employees ORDER BY name ASC').all() as Employee[];
+}
+
+export function getEmployeeById(id: number): Employee | undefined {
+  return db.prepare('SELECT * FROM employees WHERE id = ?').get(id) as Employee | undefined;
 }
 
 export function getEmployeeByCode(code: string): Employee | undefined {

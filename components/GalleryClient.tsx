@@ -1,8 +1,9 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, Clock, Info, CloudUpload, AlertCircle } from 'lucide-react';
+import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, Clock, Info, CloudUpload, AlertCircle, ScanFace } from 'lucide-react';
 import { useRealtime } from './useRealtime';
 import type { Photo } from '@/lib/db';
 
@@ -468,6 +469,7 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
 export default function GalleryClient({
   initialApproved, initialMine, userId, useS3,
 }: { initialApproved: Photo[]; initialMine: Photo[]; userId: number; useS3: boolean }) {
+  const router = useRouter();
   const [filter, setFilter]               = useState<Filter>('all');
   const [lightboxPhotos, setLightboxPhotos] = useState<Photo[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -497,10 +499,15 @@ export default function GalleryClient({
           <button key={f} onClick={() => setFilter(f)}
             className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
             style={filter === f ? { background: '#0F172A', color: 'white' } : { background: '#F1F5F9', color: '#64748B' }}>
-            {f === 'all' ? 'Photos' : 'My Photos'}
+            {f === 'all' ? 'Photos' : 'My Uploads'}
             {f === 'mine' && mine.length > 0 && <span className="ml-1.5 text-[10px] font-bold opacity-70">{mine.length}</span>}
           </button>
         ))}
+        <button onClick={() => router.push('/my-photos')}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
+          style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', color: 'white' }}>
+          <ScanFace size={14} /> Find Me
+        </button>
       </div>
 
       {/* ── Pending notice ── */}

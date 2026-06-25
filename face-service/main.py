@@ -131,6 +131,24 @@ async def embed_from_upload(file: UploadFile = File(...)):
     return EmbedResponse(embedding=embedding, face_found=True)
 
 
+class EmbedAllResponse(BaseModel):
+    embeddings: list[list[float]]  # one 512-dim vector per detected face
+    face_count: int
+
+
+@app.post("/embed-all/url", response_model=EmbedAllResponse)
+def embed_all_from_url(req: EmbedUrlRequest):
+    """Return embeddings for ALL faces detected in the image (for group photos)."""
+    try:
+        img = fetch_image_numpy(req.url)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not fetch image: {e}")
+
+    faces = face_app.get(img)
+    embeddings = [f.embedding.tolist() for f in faces]
+    return EmbedAllResponse(embeddings=embeddings, face_count=len(embeddings))
+
+
 @app.post("/search", response_model=SearchResponse)
 def search(req: SearchRequest):
     """

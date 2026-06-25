@@ -85,8 +85,19 @@ export async function PATCH(req: Request) {
   if (isErrorResponse(adminOrErr)) return adminOrErr;
   const { id, action } = await req.json();
   if (typeof id !== 'number') return NextResponse.json({ error: 'id required' }, { status: 400 });
-  if (action === 'approve') approvePhoto(id);
-  else if (action === 'reject') rejectPhoto(id);
-  else return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  if (action === 'approve') {
+    approvePhoto(id);
+    // Fire-and-forget face tagging — doesn't block the admin response
+    const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+    fetch(`${base}/api/faces/tag-photo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: req.headers.get('Cookie') ?? '' },
+      body: JSON.stringify({ photo_id: id }),
+    }).catch(() => { /* face service offline — silently skip */ });
+  } else if (action === 'reject') {
+    rejectPhoto(id);
+  } else {
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  }
   return NextResponse.json({ ok: true });
 }
