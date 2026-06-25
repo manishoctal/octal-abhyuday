@@ -71,8 +71,13 @@ function Colon() {
 }
 
 function Countdown({ target }: { target:Date }) {
-  const [t, setT] = useState<TL>(() => calc(target));
-  useEffect(() => { const id = setInterval(() => setT(calc(target)), 1000); return () => clearInterval(id); }, [target]);
+  const [t, setT] = useState<TL | null>(null);
+  useEffect(() => {
+    setT(calc(target));
+    const id = setInterval(() => setT(calc(target)), 1000);
+    return () => clearInterval(id);
+  }, [target]);
+  if (!t) return <div className="h-16 mt-4" />;
   if (t.done) return (
     <div className="flex items-center gap-2 mt-3">
       <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" style={{ boxShadow:'0 0 8px #4ade80' }} />

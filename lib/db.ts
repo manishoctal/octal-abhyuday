@@ -226,11 +226,12 @@ export function createCandidate(
   name: string,
   gender: Gender | null,
   imageUrl: string,
-  email: string | null = null
+  email: string | null = null,
+  employeeCode: string | null = null
 ): Candidate {
   const info = db
-    .prepare('INSERT INTO candidates (name, gender, image_url, email) VALUES (?, ?, ?, ?)')
-    .run(name, gender, imageUrl, email);
+    .prepare('INSERT INTO candidates (name, gender, image_url, email, employee_code) VALUES (?, ?, ?, ?, ?)')
+    .run(name, gender, imageUrl, email, employeeCode);
   return getCandidate(Number(info.lastInsertRowid))!;
 }
 
@@ -491,15 +492,29 @@ export function deleteEventInfo(id: number) {
 
 // ---------- attendance ----------
 
+// Inline migration: add location columns to attendance if not present
+{
+  const cols = (db.prepare('PRAGMA table_info(attendance)').all() as { name: string }[]).map(c => c.name);
+  if (!cols.includes('lat'))        db.exec('ALTER TABLE attendance ADD COLUMN lat REAL');
+  if (!cols.includes('lng'))        db.exec('ALTER TABLE attendance ADD COLUMN lng REAL');
+  if (!cols.includes('distance_m')) db.exec('ALTER TABLE attendance ADD COLUMN distance_m REAL');
+}
+
 export function checkIn(userId: number) {
   return db.prepare(
     'INSERT OR IGNORE INTO attendance (user_id) VALUES (?)'
   ).run(userId);
 }
 
+export function selfCheckIn(userId: number, lat: number, lng: number, distanceM: number) {
+  return db.prepare(
+    'INSERT OR IGNORE INTO attendance (user_id, lat, lng, distance_m) VALUES (?, ?, ?, ?)'
+  ).run(userId, lat, lng, distanceM);
+}
+
 export function getAttendance(userId: number) {
   return db.prepare('SELECT * FROM attendance WHERE user_id = ?').get(userId) as
-    | { id: number; user_id: number; checked_in_at: string }
+    | { id: number; user_id: number; checked_in_at: string; lat: number | null; lng: number | null; distance_m: number | null }
     | undefined;
 }
 
@@ -508,7 +523,31 @@ export function listAttendance() {
     `SELECT a.*, u.name, u.email, u.department
      FROM attendance a JOIN users u ON u.id = a.user_id
      ORDER BY a.checked_in_at DESC`
-  ).all() as { id: number; user_id: number; checked_in_at: string; name: string; email: string; department: string | null }[];
+  ).all() as {
+    id: number; user_id: number; checked_in_at: string;
+    lat: number | null; lng: number | null; distance_m: number | null;
+    name: string; email: string; department: string | null;
+  }[];
+}
+
+export interface VenueConfig {
+  lat: number | null;
+  lng: number | null;
+  radius_km: number;
+}
+
+export function getVenueConfig(): VenueConfig {
+  return {
+    lat:       getSetting('venue_lat')    ? Number(getSetting('venue_lat'))    : null,
+    lng:       getSetting('venue_lng')    ? Number(getSetting('venue_lng'))    : null,
+    radius_km: getSetting('venue_radius_km') ? Number(getSetting('venue_radius_km')) : 0.5,
+  };
+}
+
+export function setVenueConfig(lat: number, lng: number, radiusKm: number) {
+  setSetting('venue_lat',       String(lat));
+  setSetting('venue_lng',       String(lng));
+  setSetting('venue_radius_km', String(radiusKm));
 }
 
 // ---------- push subscriptions ----------
@@ -737,6 +776,165 @@ export function listAllUsers() {
   return db.prepare(
     `SELECT id, name, email, department, profile_photo_url FROM users ORDER BY name ASC`
   ).all() as { id: number; name: string; email: string; department: string | null; profile_photo_url: string | null }[];
+}
+
+// ═══════════════════════════════════════════════════════
+//  EMPLOYEES (admin-managed master roster)
+// ═══════════════════════════════════════════════════════
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    department TEXT,
+    gender TEXT CHECK (gender IN ('male','female')),
+    profile_photo_url TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS otp_codes (
+    email TEXT PRIMARY KEY COLLATE NOCASE,
+    code TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+`);
+
+// Inline migrations: add employee_code to users + candidates
+const userColsV2 = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
+if (!userColsV2.includes('employee_code')) {
+  db.exec('ALTER TABLE users ADD COLUMN employee_code TEXT');
+}
+
+const candidateColsV2 = (db.prepare('PRAGMA table_info(candidates)').all() as { name: string }[]).map(c => c.name);
+if (!candidateColsV2.includes('employee_code')) {
+  db.exec('ALTER TABLE candidates ADD COLUMN employee_code TEXT');
+}
+
+// Back-fill employee_code from image URL filename for existing candidates.
+// Filenames like "1423.png" → employee_code "1423" (numeric-only filenames only).
+{
+  const rows = db.prepare(
+    `SELECT id, image_url FROM candidates WHERE employee_code IS NULL AND image_url IS NOT NULL`
+  ).all() as { id: number; image_url: string }[];
+  const upd = db.prepare('UPDATE candidates SET employee_code = ? WHERE id = ?');
+  for (const r of rows) {
+    try {
+      const filename = (r.image_url.split('/').pop() ?? '').split('?')[0];
+      const code = filename.replace(/\.[^.]+$/, '');
+      if (/^\d+$/.test(code)) upd.run(code, r.id);
+    } catch { /* ignore */ }
+  }
+}
+
+// Seed employees from candidates that have an employee_code but no matching employee record yet.
+// Runs once at startup; safe to repeat (INSERT OR IGNORE skips duplicates by employee_code/email).
+{
+  const candidates = db.prepare(
+    `SELECT employee_code, name, gender, image_url, email
+     FROM candidates
+     WHERE employee_code IS NOT NULL AND employee_code != ''`
+  ).all() as { employee_code: string; name: string; gender: string | null; image_url: string | null; email: string | null }[];
+
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO employees (employee_code, name, email, gender, profile_photo_url, is_active)
+     VALUES (?, ?, ?, ?, ?, 1)`
+  );
+
+  let seeded = 0;
+  for (const c of candidates) {
+    // Require at least a placeholder email if missing (use code@internal.local)
+    const email = c.email?.trim() || `${c.employee_code}@internal.local`;
+    try {
+      const result = insert.run(c.employee_code, c.name, email, c.gender ?? null, c.image_url ?? null) as { changes: number };
+      if (result.changes) seeded++;
+    } catch { /* already exists under a different unique constraint */ }
+  }
+  if (seeded > 0) console.log(`[db] Seeded ${seeded} employee(s) from candidates table.`);
+}
+
+export interface Employee {
+  id: number;
+  employee_code: string;
+  name: string;
+  email: string;
+  department: string | null;
+  gender: 'male' | 'female' | null;
+  profile_photo_url: string | null;
+  is_active: number;
+  created_at: string;
+}
+
+export function listEmployees(): Employee[] {
+  return db.prepare('SELECT * FROM employees ORDER BY name ASC').all() as Employee[];
+}
+
+export function getEmployeeByCode(code: string): Employee | undefined {
+  return db.prepare('SELECT * FROM employees WHERE employee_code = ?').get(code) as Employee | undefined;
+}
+
+export function getEmployeeByEmail(email: string): Employee | undefined {
+  return db.prepare('SELECT * FROM employees WHERE email = ?').get(email.toLowerCase()) as Employee | undefined;
+}
+
+export function createEmployee(
+  employeeCode: string, name: string, email: string,
+  department: string | null, gender: 'male' | 'female' | null,
+  profilePhotoUrl: string | null
+): Employee {
+  const r = db.prepare(
+    `INSERT INTO employees (employee_code, name, email, department, gender, profile_photo_url)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl);
+  return db.prepare('SELECT * FROM employees WHERE id = ?').get(r.lastInsertRowid) as Employee;
+}
+
+export function updateEmployee(
+  id: number, employeeCode: string, name: string, email: string,
+  department: string | null, gender: 'male' | 'female' | null,
+  profilePhotoUrl: string | null, isActive: number
+) {
+  db.prepare(
+    `UPDATE employees SET employee_code=?, name=?, email=?, department=?, gender=?, profile_photo_url=?, is_active=? WHERE id=?`
+  ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl, isActive, id);
+}
+
+export function deleteEmployee(id: number) {
+  db.prepare('DELETE FROM employees WHERE id = ?').run(id);
+}
+
+// OTP storage (DB-backed, survives hot-reload)
+export function saveOtp(email: string, code: string, ttlSeconds = 300) {
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+  db.prepare(
+    `INSERT INTO otp_codes (email, code, expires_at) VALUES (?, ?, ?)
+     ON CONFLICT(email) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at`
+  ).run(email.toLowerCase(), code, expiresAt);
+}
+
+export function verifyAndConsumeOtp(email: string, code: string): boolean {
+  const row = db.prepare('SELECT code, expires_at FROM otp_codes WHERE email = ?')
+    .get(email.toLowerCase()) as { code: string; expires_at: string } | undefined;
+  if (!row) return false;
+  if (new Date(row.expires_at) < new Date()) {
+    db.prepare('DELETE FROM otp_codes WHERE email = ?').run(email.toLowerCase());
+    return false;
+  }
+  if (row.code !== code) return false;
+  db.prepare('DELETE FROM otp_codes WHERE email = ?').run(email.toLowerCase());
+  return true;
+}
+
+// Upsert user linked to an employee record
+export function upsertUserFromEmployee(employee: Employee): { id: number; email: string; name: string; employee_code: string } {
+  db.prepare(
+    `INSERT INTO users (email, name, employee_code)
+     VALUES (?, ?, ?)
+     ON CONFLICT(email) DO UPDATE SET name=excluded.name, employee_code=excluded.employee_code`
+  ).run(employee.email, employee.name, employee.employee_code);
+  return db.prepare('SELECT id, email, name, employee_code FROM users WHERE email = ?')
+    .get(employee.email) as { id: number; email: string; name: string; employee_code: string };
 }
 
 // ---------- points / gamification ----------

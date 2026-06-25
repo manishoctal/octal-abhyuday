@@ -15,10 +15,7 @@ interface StatsResponse {
   state: AppState;
 }
 
-type AdminTab = 'control' | 'candidates';
-
 export default function VotingModule() {
-  const [tab, setTab] = useState<AdminTab>('control');
   const [toast, setToast] = useState('');
 
   const notify = (msg: string) => {
@@ -28,28 +25,7 @@ export default function VotingModule() {
 
   return (
     <div>
-      <div className="flex gap-2 mb-5">
-        {(
-          [
-            ['control', '🎛️ Voting Control'],
-            ['candidates', '👥 Candidates'],
-          ] as [AdminTab, string][]
-        ).map(([t, label]) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 rounded-2xl py-3 text-sm sm:text-base font-bold transition ${
-              tab === t
-                ? 'bg-slate-900 text-white shadow-lg'
-                : 'bg-white text-slate-600 border border-slate-200'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'control' ? <ControlTab notify={notify} /> : <CandidatesTab notify={notify} />}
+      <ControlTab notify={notify} />
 
       <AnimatePresence>
         {toast && (
@@ -465,255 +441,175 @@ function TopFive({ title, list }: { title: string; list: CandidateWithVotes[] })
   );
 }
 
-/* ---------------- Candidates management ---------------- */
+/* ---------------- Candidates from Employee Roster ---------------- */
 
-interface CandidatesResponse {
-  candidates: CandidateWithVotes[];
+interface EmployeesResponse {
+  employees: {
+    id: number; employee_code: string; name: string; email: string;
+    gender: Gender | null; profile_photo_url: string | null; is_active: number;
+  }[];
 }
-
-interface CsvReport {
-  added: number;
-  total: number;
-  report: { row: number; name: string; status: 'added' | 'error'; message?: string }[];
-}
-
-const emptyForm = { id: 0, name: '', gender: 'male' as Gender | '', imageUrl: '', email: '' };
+interface CandidatesResponse { candidates: CandidateWithVotes[] }
 
 function CandidatesTab({ notify }: { notify: (msg: string) => void }) {
   useRealtime(['/api/admin/candidates']);
-  const { data, mutate } = useSWR<CandidatesResponse>('/api/admin/candidates', fetcher);
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [csvReport, setCsvReport] = useState<CsvReport | null>(null);
+  const { data: empData }  = useSWR<EmployeesResponse>('/api/admin/employees', fetcher);
+  const { data: candData, mutate } = useSWR<CandidatesResponse>('/api/admin/candidates', fetcher);
   const [search, setSearch] = useState('');
-  const fileRef = useRef<HTMLInputElement>(null);
-  const editing = form.id !== 0;
+  const [busy, setBusy] = useState<number | null>(null); // employee id being toggled
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+  if (!empData || !candData) return <Spinner />;
+
+  // Index candidates by employee_code and by email for quick lookup
+  const candByCode  = new Map(candData.candidates.map(c => [c.employee_code ?? '', c]));
+  const candByEmail = new Map(candData.candidates.map(c => [c.email ?? '', c]));
+
+  function findCandidate(emp: EmployeesResponse['employees'][0]) {
+    return candByCode.get(emp.employee_code) ?? candByEmail.get(emp.email) ?? null;
+  }
+
+  async function toggle(emp: EmployeesResponse['employees'][0]) {
+    const existing = findCandidate(emp);
+    setBusy(emp.id);
     try {
-      const payload = { ...form, id: editing ? form.id : undefined, gender: form.gender || null };
-      const res = await fetch('/api/admin/candidates', {
-        method: editing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        notify(body.error ?? 'Save failed');
-        return;
+      if (existing) {
+        // Remove from ballot
+        const res = await fetch('/api/admin/candidates', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: existing.id }),
+        });
+        notify(res.ok ? `${emp.name} removed from ballot` : 'Remove failed');
+      } else {
+        // Add to ballot
+        if (!emp.gender) {
+          notify(`Set a gender for ${emp.name} in the Employee Roster first.`);
+          return;
+        }
+        const res = await fetch('/api/admin/candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: emp.name,
+            gender: emp.gender,
+            imageUrl: emp.profile_photo_url ?? `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(emp.name)}`,
+            email: emp.email,
+            employee_code: emp.employee_code,
+          }),
+        });
+        const body = await res.json();
+        notify(res.ok ? `${emp.name} added to ballot ✅` : (body.error ?? 'Add failed'));
       }
-      notify(editing ? 'Candidate updated ✅' : `${form.name} added ✅`);
-      setForm(emptyForm);
       mutate();
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
   }
 
-  async function remove(c: CandidateWithVotes) {
-    if (!window.confirm(`Delete ${c.name}? Their ${c.vote_count} vote(s) will be removed too.`)) return;
-    const res = await fetch('/api/admin/candidates', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: c.id }),
-    });
-    notify(res.ok ? `${c.name} deleted` : 'Delete failed');
-    mutate();
+  async function updateGender(emp: EmployeesResponse['employees'][0], gender: Gender) {
+    const existing = findCandidate(emp);
+    if (!existing) return;
+    setBusy(emp.id);
+    try {
+      const res = await fetch('/api/admin/candidates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: existing.id, name: existing.name, gender, imageUrl: existing.image_url, email: existing.email }),
+      });
+      notify(res.ok ? 'Gender updated ✅' : 'Update failed');
+      mutate();
+    } finally { setBusy(null); }
   }
 
-  async function uploadCsv(file: File) {
-    const fd = new FormData();
-    fd.append('file', file);
-    const res = await fetch('/api/admin/candidates/csv', { method: 'POST', body: fd });
-    const body = await res.json();
-    if (!res.ok) {
-      notify(body.error ?? 'CSV upload failed');
-      return;
-    }
-    setCsvReport(body);
-    notify(`CSV processed: ${body.added}/${body.total} added`);
-    mutate();
-    if (fileRef.current) fileRef.current.value = '';
-  }
+  const q = search.trim().toLowerCase();
+  const filtered = empData.employees.filter(e =>
+    !q || e.name.toLowerCase().includes(q) || e.employee_code.includes(q)
+  );
 
-  if (!data) return <Spinner />;
+  const onBallot   = candData.candidates.length;
+  const maleBallot = candData.candidates.filter(c => c.gender === 'male').length;
+  const femBallot  = candData.candidates.filter(c => c.gender === 'female').length;
 
   return (
-    <div className="space-y-5">
-      {/* Add / edit form */}
-      <form onSubmit={save} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-        <h3 className="font-bold text-slate-900">{editing ? `Edit: ${form.name}` : 'Add candidate'}</h3>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <input
-            placeholder="Full name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-            className="rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          <select
-            value={form.gender}
-            onChange={(e) => setForm({ ...form, gender: e.target.value as Gender | '' })}
-            className="rounded-xl border border-slate-300 px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="">— gender not set (off ballot) —</option>
-          </select>
-        </div>
-        <input
-          type="email"
-          placeholder="Email (optional — links to the employee, prevents duplicates)"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          className="w-full rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <div className="flex gap-3 items-start">
-          <input
-            placeholder="Image URL (https://…)"
-            value={form.imageUrl}
-            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-            required
-            className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {form.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={form.imageUrl}
-              alt="preview"
-              className="w-11 h-11 rounded-full object-cover border border-slate-200 bg-slate-50"
-              onError={(e) => ((e.target as HTMLImageElement).style.opacity = '0.2')}
-              onLoad={(e) => ((e.target as HTMLImageElement).style.opacity = '1')}
-            />
-          )}
-        </div>
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex-1 rounded-xl bg-brand-600 py-3 font-bold text-white hover:bg-brand-700 disabled:opacity-60"
-          >
-            {saving ? 'Saving…' : editing ? 'Update candidate' : '+ Add candidate'}
-          </button>
-          {editing && (
-            <button
-              type="button"
-              onClick={() => setForm(emptyForm)}
-              className="rounded-xl border border-slate-300 px-4 font-semibold text-slate-600"
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
-
-      {/* CSV upload */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <h3 className="font-bold text-slate-900">Bulk upload (CSV)</h3>
-        <p className="text-xs text-slate-500 mt-1 mb-3">
-          Columns: <code className="bg-slate-100 px-1.5 py-0.5 rounded">name, gender, image_url, email</code> — header
-          optional. Gender is male/female (or blank = off ballot). Rows with an email update the existing
-          candidate instead of duplicating — works with auto-imported employees too.
-        </p>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".csv,text/csv"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) uploadCsv(f);
-          }}
-          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-brand-50 file:px-4 file:py-2.5 file:font-bold file:text-brand-700 hover:file:bg-brand-100"
-        />
-        {csvReport && (
-          <div className="mt-3 max-h-44 overflow-y-auto rounded-xl bg-slate-50 p-3 text-xs space-y-1">
-            {csvReport.report.map((r, i) => (
-              <div key={i} className={r.status === 'added' ? 'text-green-700' : 'text-red-600'}>
-                Row {r.row}: {r.status === 'added' ? `✓ ${r.name} added` : `✗ ${r.message}`}
-              </div>
-            ))}
-          </div>
-        )}
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="On ballot" value={onBallot} emoji="🗳" />
+        <StatCard label="Male" value={maleBallot} emoji="M" />
+        <StatCard label="Female" value={femBallot} emoji="F" />
       </div>
 
-      {/* Candidate list */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <h3 className="font-bold text-slate-900">All candidates ({data.candidates.length})</h3>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 Search name or email…"
-            className="flex-1 min-w-[180px] max-w-xs rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-        </div>
-        {data.candidates.length === 0 ? (
-          <p className="text-sm text-slate-400">No candidates yet — add some above.</p>
-        ) : (
-          (() => {
-            const q = search.trim().toLowerCase();
-            const filtered = q
-              ? data.candidates.filter(
-                  (c) => c.name.toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q)
-                )
-              : data.candidates;
-            if (filtered.length === 0) {
-              return <p className="text-sm text-slate-400">No match for “{search}”.</p>;
-            }
-            return (
-          <div className="space-y-2">
-            {filtered.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 rounded-xl border border-slate-100 p-2.5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={c.image_url}
-                  alt={c.name}
-                  className="w-10 h-10 rounded-full object-cover bg-slate-100"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(c.name)}`;
-                  }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-800 truncate">
-                    {c.is_finalist ? '⭐ ' : ''}
-                    {c.name}
-                  </p>
-                  <p className="text-xs text-slate-400 truncate">
-                    {c.gender === 'male' ? '🤵 Male' : c.gender === 'female' ? '👸 Female' : '⚠️ No gender — off ballot'} ·{' '}
-                    {c.vote_count} votes
-                    {c.email ? ` · ${c.email}` : ''}
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    setForm({
-                      id: c.id,
-                      name: c.name,
-                      gender: c.gender ?? '',
-                      imageUrl: c.image_url,
-                      email: c.email ?? '',
-                    })
-                  }
-                  className="text-sm font-semibold text-brand-600 hover:bg-brand-50 px-3 py-1.5 rounded-lg"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => remove(c)}
-                  className="text-sm font-semibold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg"
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
-          </div>
-            );
-          })()
+      <p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-3">
+        Toggle employees onto the voting ballot. Gender is pulled from the Employee Roster — update it there if needed. Employees without a gender are shown with a warning and cannot be added until gender is set.
+      </p>
+
+      {/* Search */}
+      <input
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="🔍 Search by name or employee code…"
+        className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+      />
+
+      {/* Employee list */}
+      <div className="space-y-2">
+        {filtered.length === 0 && (
+          <p className="text-sm text-slate-400 text-center py-6">No employees found.</p>
         )}
+        {filtered.map(emp => {
+          const cand    = findCandidate(emp);
+          const onBallot = !!cand;
+          const isBusy  = busy === emp.id;
+          const noGender = !emp.gender;
+
+          return (
+            <div key={emp.id}
+              className={`flex items-center gap-3 rounded-xl border p-3 transition-colors ${
+                onBallot ? 'border-brand-300 bg-brand-50/50' : 'border-slate-200 bg-white'
+              } ${!emp.is_active ? 'opacity-50' : ''}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={emp.profile_photo_url ?? `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(emp.name)}`}
+                alt={emp.name}
+                className="w-10 h-10 rounded-full object-cover bg-slate-100 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-800 text-sm truncate">
+                  {cand?.is_finalist ? '⭐ ' : ''}{emp.name}
+                  <span className="ml-1.5 text-[10px] font-bold text-slate-400">#{emp.employee_code}</span>
+                </p>
+                <p className="text-xs text-slate-400">
+                  {noGender
+                    ? <span className="text-amber-600 font-semibold">⚠️ No gender — set in Roster to add</span>
+                    : emp.gender === 'male' ? '🤵 Male' : '👸 Female'}
+                  {onBallot && cand && <span className="ml-2 text-brand-600 font-semibold">{cand.vote_count} votes</span>}
+                </p>
+              </div>
+              {/* Gender override while on ballot */}
+              {onBallot && cand && (
+                <select
+                  value={cand.gender ?? ''}
+                  onChange={e => updateGender(emp, e.target.value as Gender)}
+                  disabled={isBusy}
+                  className="text-xs rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400"
+                >
+                  <option value="male">🤵 Male</option>
+                  <option value="female">👸 Female</option>
+                </select>
+              )}
+              <button
+                onClick={() => toggle(emp)}
+                disabled={isBusy || (!onBallot && noGender)}
+                className={`shrink-0 rounded-xl px-4 py-2 text-sm font-bold transition disabled:opacity-40 ${
+                  onBallot
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                    : 'bg-brand-600 text-white hover:bg-brand-700'
+                }`}
+              >
+                {isBusy ? '…' : onBallot ? 'Remove' : 'Add'}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

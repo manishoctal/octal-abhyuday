@@ -15,6 +15,14 @@ export interface AdminModule {
  */
 export const adminModules: AdminModule[] = [
   {
+    id: 'employees',
+    name: 'Employee Roster',
+    emoji: '👥',
+    description: 'Manage the employee master list — add, edit, upload photos and set employee codes. Only listed employees can log in.',
+    href: '/admin/employees',
+    status: 'live',
+  },
+  {
     id: 'voting',
     name: 'Popularity Voting',
     emoji: '🗳️',
@@ -65,9 +73,9 @@ export const adminModules: AdminModule[] = [
   },
   {
     id: 'scan',
-    name: 'QR Attendance',
-    emoji: '🪪',
-    description: 'Scan employee QR badges at the entrance, track attendance, and export CSV',
+    name: 'Attendance',
+    emoji: '📍',
+    description: 'Set venue GPS coordinates and radius. Employees self check-in from their profile — only accepted within the configured distance.',
     href: '/admin/scan',
     status: 'live',
   },

@@ -1,26 +1,38 @@
 import { NextResponse } from 'next/server';
-import { isValidEmail, isAdminEmail, nameFromEmail, createSession, allowedDomain } from '@/lib/auth';
-import { upsertUser, ensureEmployeeCandidate } from '@/lib/db';
+import { isAdminCode, createSession } from '@/lib/auth';
+import { getEmployeeByCode, verifyAndConsumeOtp, upsertUserFromEmployee } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  const { email, otp } = await req.json().catch(() => ({}));
-  if (typeof email !== 'string' || !isValidEmail(email)) {
-    return NextResponse.json(
-      { error: `Please use your official @${allowedDomain()} email` },
-      { status: 400 }
-    );
-  }
-  if (typeof otp !== 'string' || otp.trim() !== (process.env.OTP_CODE ?? '1234')) {
-    return NextResponse.json({ error: 'Invalid OTP. Please try again.' }, { status: 401 });
+  const body = await req.json().catch(() => ({}));
+  const employeeCode = String(body.employee_code ?? '').trim();
+  const otp          = String(body.otp ?? '').trim();
+
+  if (!employeeCode || !otp) {
+    return NextResponse.json({ error: 'Employee code and OTP are required.' }, { status: 400 });
   }
 
-  const normalized = email.trim().toLowerCase();
-  const user = upsertUser(normalized, nameFromEmail(normalized));
-  const isAdmin = isAdminEmail(normalized);
-  // Every employee who signs in becomes a round-1 candidate (deduped by email);
-  // admins are organizers, not candidates
-  if (!isAdmin) ensureEmployeeCandidate(normalized, user.name);
-  await createSession({ id: user.id, email: user.email, name: user.name, isAdmin });
+  const valid = verifyAndConsumeOtp(employeeCode, otp);
+  if (!valid) {
+    return NextResponse.json({ error: 'Invalid or expired OTP. Please try again.' }, { status: 401 });
+  }
+
+  const employee = getEmployeeByCode(employeeCode);
+  if (!employee) {
+    return NextResponse.json({ error: 'Employee record not found.' }, { status: 404 });
+  }
+
+  const isAdmin = isAdminCode(employeeCode);
+  const user = upsertUserFromEmployee(employee);
+
+  await createSession({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    employee_code: employeeCode,
+    isAdmin,
+  });
 
   return NextResponse.json({ ok: true, isAdmin });
 }

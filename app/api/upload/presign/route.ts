@@ -4,7 +4,7 @@ import { isS3Configured, presignUpload, getPublicUrl, normalizeExt } from '@/lib
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_CONTEXTS = new Set<string>(['gallery', 'profile']);
+const ALLOWED_CONTEXTS = new Set<string>(['gallery', 'profile', 'employee']);
 const ALLOWED_MIME = new Set<string>([
   'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
   'image/webp', 'image/heic', 'image/heif',
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const { filename, contentType, context } = await req.json() as {
     filename: string;
     contentType: string;
-    context: 'gallery' | 'profile';
+    context: 'gallery' | 'profile' | 'employee';
   };
 
   if (!context || !ALLOWED_CONTEXTS.has(context)) {

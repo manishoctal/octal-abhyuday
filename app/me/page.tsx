@@ -29,6 +29,7 @@ export default async function MePage() {
           eventName={appState.event_name}
         />
 
+
         <Link
           href="/profile"
           className="card mt-4 px-5 py-4 flex items-center justify-between active:scale-[0.99] transition-transform"

@@ -58,7 +58,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const candidate = createCandidate(v.name, v.gender, v.imageUrl, v.email);
+  const employeeCode = typeof body.employee_code === 'string' ? body.employee_code.trim() : null;
+  const candidate = createCandidate(v.name, v.gender, v.imageUrl, v.email, employeeCode || null);
   broadcast('candidates');
   return NextResponse.json({ ok: true, candidate });
 }

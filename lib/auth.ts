@@ -25,6 +25,14 @@ export function isAdminEmail(email: string) {
   return admins.includes(email.trim().toLowerCase());
 }
 
+export function isAdminCode(code: string) {
+  const codes = (process.env.ADMIN_CODES ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return codes.includes(code.trim());
+}
+
 export function nameFromEmail(email: string) {
   const local = email.split('@')[0];
   return local
@@ -59,7 +67,7 @@ export async function getSession(): Promise<SessionUser | null> {
       email: payload.email as string,
       name: payload.name as string,
       // Re-derive so changes to ADMIN_EMAILS apply without re-login
-      isAdmin: isAdminEmail(payload.email as string),
+      isAdmin: isAdminEmail(payload.email as string) || isAdminCode(payload.employee_code as string ?? ''),
     };
   } catch {
     return null;

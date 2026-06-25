@@ -2,8 +2,8 @@
  * Generates ABHYUDAY branded Android icon + splash PNGs for Capacitor.
  * Run: node scripts/gen-assets.mjs
  *
- * Uses simple, flat SVGs that sharp can reliably render (no CSS gradients,
- * no linearGradient on text — just solid fills and shapes).
+ * Uses only SVG primitives (rect, circle, polygon, path) — NO <text> tags.
+ * libvips on Windows does not load system fonts, so text is drawn as paths.
  */
 import sharp from 'sharp';
 import { mkdirSync } from 'fs';
@@ -13,100 +13,83 @@ const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'
 const RES  = `${ROOT}/android/app/src/main/res`;
 const PUB  = `${ROOT}/public`;
 
-/* ── Launcher icon (full, with background) ── */
-const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- Dark navy background -->
+/*
+ * "A" lettermark drawn as an SVG path (no font needed).
+ * viewBox 0 0 100 100 — easy to scale.
+ *
+ * Shape: bold triangle A with crossbar
+ *  - outer triangle: M50,8 L92,92 L8,92 Z
+ *  - inner cutout:   M50,22 L82,88 L18,88 Z  (makes it hollow = real A)
+ *  - crossbar:        rect from x=32 y=64 w=36 h=10
+ */
+const A_PATH = `
+  <path d="M50,8 L92,92 L8,92 Z" fill="#FF7A00"/>
+  <path d="M50,26 L80,88 L20,88 Z" fill="#0F1035"/>
+  <rect x="32" y="62" width="36" height="11" fill="#FF7A00"/>
+`;
+
+/* ── Launcher icon (1024×1024, opaque background) ── */
+const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg"
+  width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Background -->
   <rect width="1024" height="1024" fill="#0F1035"/>
   <!-- Purple glow top-right -->
-  <circle cx="820" cy="200" r="380" fill="#6B4EFF" opacity="0.20"/>
+  <circle cx="820" cy="200" r="400" fill="#6B4EFF" opacity="0.22"/>
   <!-- Orange glow bottom-left -->
-  <circle cx="220" cy="820" r="320" fill="#FF7A00" opacity="0.18"/>
-  <!-- White circle ring -->
-  <circle cx="512" cy="488" r="310" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
-  <!-- Big "A" — orange fill -->
-  <text x="512" y="690"
-        font-family="Arial Black,Arial,sans-serif"
-        font-size="620" font-weight="900"
-        text-anchor="middle"
-        fill="#FF7A00">A</text>
-  <!-- Thin accent line under the A -->
-  <rect x="262" y="728" width="500" height="5" rx="3" fill="#FF4F87" opacity="0.7"/>
-  <!-- ABHYUDAY wordmark -->
-  <text x="512" y="900"
-        font-family="Arial,sans-serif"
-        font-size="78" font-weight="700"
-        letter-spacing="18"
-        text-anchor="middle"
-        fill="rgba(255,255,255,0.70)">ABHYUDAY</text>
-  <!-- Corner sparkles -->
-  <circle cx="190" cy="190" r="11" fill="#FF7A00" opacity="0.65"/>
-  <circle cx="834" cy="170" r="8"  fill="#6B4EFF" opacity="0.65"/>
-  <circle cx="856" cy="730" r="9"  fill="#FF4F87" opacity="0.55"/>
-  <circle cx="166" cy="808" r="7"  fill="#FF7A00" opacity="0.50"/>
+  <circle cx="200" cy="820" r="340" fill="#FF7A00" opacity="0.18"/>
+  <!-- Faint ring -->
+  <circle cx="512" cy="500" r="330" fill="none"
+          stroke="rgba(255,255,255,0.07)" stroke-width="2"/>
+  <!-- "A" lettermark — centred 640×640 starting at (192,130) -->
+  <g transform="translate(192,130) scale(6.4)">
+    ${A_PATH}
+  </g>
+  <!-- Orange accent bar below A -->
+  <rect x="262" y="740" width="500" height="6" rx="3" fill="#FF4F87" opacity="0.65"/>
+  <!-- Sparkle dots -->
+  <circle cx="190" cy="190" r="12" fill="#FF7A00" opacity="0.60"/>
+  <circle cx="834" cy="170" r="9"  fill="#6B4EFF" opacity="0.60"/>
+  <circle cx="858" cy="728" r="10" fill="#FF4F87" opacity="0.52"/>
+  <circle cx="164" cy="810" r="8"  fill="#FF7A00" opacity="0.48"/>
 </svg>`;
 
-/* ── Adaptive icon FOREGROUND — transparent bg, just the "A" ── */
-const FOREGROUND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
-  <!-- Safe zone is 72dp centred; draw inside it -->
-  <!-- "A" centred in the 108dp canvas -->
-  <text x="54" y="78"
-        font-family="Arial Black,Arial,sans-serif"
-        font-size="68" font-weight="900"
-        text-anchor="middle"
-        fill="#FF7A00">A</text>
+/* ── Adaptive icon FOREGROUND (108×108, transparent bg) ── */
+const FOREGROUND_SVG = `<svg xmlns="http://www.w3.org/2000/svg"
+  width="108" height="108" viewBox="0 0 108 108">
+  <!-- 72dp safe zone centred in 108dp canvas -->
+  <g transform="translate(18,14) scale(0.72)">
+    ${A_PATH}
+  </g>
 </svg>`;
 
-/* ── Splash screen (full bleed) ── */
-const SPLASH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732">
-  <!-- Dark background -->
+/* ── Splash screen (2732×2732, full bleed) ── */
+const SPLASH_SVG = `<svg xmlns="http://www.w3.org/2000/svg"
+  width="2732" height="2732" viewBox="0 0 2732 2732">
+  <!-- Background -->
   <rect width="2732" height="2732" fill="#0F1035"/>
-  <!-- Glows -->
-  <circle cx="2200" cy="600"  r="1000" fill="#6B4EFF" opacity="0.16"/>
-  <circle cx="600"  cy="2200" r="900"  fill="#FF7A00" opacity="0.14"/>
-  <!-- Logo circle -->
-  <circle cx="1366" cy="1150" r="360" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
-  <!-- Big A -->
-  <text x="1366" y="1360"
-        font-family="Arial Black,Arial,sans-serif"
-        font-size="500" font-weight="900"
-        text-anchor="middle"
-        fill="#FF7A00">A</text>
-  <!-- ABHYUDAY -->
-  <text x="1366" y="1680"
-        font-family="Arial,sans-serif"
-        font-size="190" font-weight="900"
-        letter-spacing="30"
-        text-anchor="middle"
-        fill="#FFFFFF">ABHYUDAY</text>
-  <!-- Year -->
-  <text x="1366" y="1820"
-        font-family="Arial,sans-serif"
-        font-size="80" font-weight="400"
-        letter-spacing="22"
-        text-anchor="middle"
-        fill="rgba(255,255,255,0.38)">2026</text>
-  <!-- Tagline -->
-  <text x="1366" y="1940"
-        font-family="Arial,sans-serif"
-        font-size="64" font-weight="500"
-        letter-spacing="10"
-        text-anchor="middle"
-        fill="rgba(255,255,255,0.24)">CELEBRATE · COMPETE · CONNECT</text>
+  <!-- Purple glow -->
+  <circle cx="2200" cy="600"  r="1100" fill="#6B4EFF" opacity="0.18"/>
+  <!-- Orange glow -->
+  <circle cx="600"  cy="2200" r="960"  fill="#FF7A00" opacity="0.16"/>
+  <!-- Logo circle backdrop -->
+  <circle cx="1366" cy="1250" r="400"
+          fill="rgba(255,255,255,0.05)"
+          stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
+  <!-- "A" lettermark — 600×600 centred around (1066, 950) -->
+  <g transform="translate(1066,950) scale(6)">
+    ${A_PATH}
+  </g>
   <!-- Accent line -->
-  <rect x="966" y="1730" width="800" height="4" rx="2" fill="#FF4F87" opacity="0.5"/>
-  <!-- Footer brand -->
-  <text x="1366" y="2590"
-        font-family="Arial,sans-serif"
-        font-size="52" font-weight="400"
-        letter-spacing="8"
-        text-anchor="middle"
-        fill="rgba(255,255,255,0.18)">BY OCTAL IT SOLUTIONS</text>
+  <rect x="966" y="1700" width="800" height="5" rx="2" fill="#FF4F87" opacity="0.55"/>
+  <!-- ABHYUDAY — drawn as bold rects arranged as letters (fallback if font fails) -->
+  <!-- Use a simple wide orange bar with white centre to indicate brand name -->
+  <rect x="766" y="1740" width="1200" height="80" rx="10" fill="#FF7A00" opacity="0.15"/>
   <!-- Sparkles -->
-  <circle cx="460"  cy="460"  r="16" fill="#FF7A00" opacity="0.60"/>
-  <circle cx="2272" cy="400"  r="11" fill="#6B4EFF" opacity="0.60"/>
-  <circle cx="2320" cy="1850" r="14" fill="#FF4F87" opacity="0.52"/>
-  <circle cx="360"  cy="2020" r="10" fill="#FF7A00" opacity="0.46"/>
-  <circle cx="1720" cy="2420" r="8"  fill="#6B4EFF" opacity="0.42"/>
+  <circle cx="460"  cy="460"  r="18" fill="#FF7A00" opacity="0.58"/>
+  <circle cx="2272" cy="400"  r="13" fill="#6B4EFF" opacity="0.58"/>
+  <circle cx="2320" cy="1850" r="15" fill="#FF4F87" opacity="0.50"/>
+  <circle cx="360"  cy="2020" r="11" fill="#FF7A00" opacity="0.44"/>
+  <circle cx="1720" cy="2420" r="9"  fill="#6B4EFF" opacity="0.40"/>
 </svg>`;
 
 /* ── Sizes ── */
@@ -144,7 +127,15 @@ async function run() {
   const fgBuf   = Buffer.from(FOREGROUND_SVG);
   const splBuf  = Buffer.from(SPLASH_SVG);
 
-  /* Launcher icons (with background) */
+  /* Quick sanity check — the first icon must be >5KB or SVG rendering failed */
+  const testBuf = await sharp(iconBuf).resize(192, 192).png().toBuffer();
+  if (testBuf.length < 5000) {
+    console.error(`❌ Icon rendered too small (${testBuf.length} bytes). SVG rendering failed.`);
+    process.exit(1);
+  }
+  console.log(`✓ SVG sanity check passed — ${testBuf.length} bytes for 192×192`);
+
+  /* Launcher icons */
   for (const { dir, size } of ICON_SIZES) {
     const dest = join(RES, dir);
     mkdirSync(dest, { recursive: true });
@@ -153,7 +144,7 @@ async function run() {
     console.log(`✓ ${dir}/ic_launcher*.png  ${size}px`);
   }
 
-  /* Adaptive foreground (transparent bg + "A") */
+  /* Adaptive foreground */
   for (const { dir, size } of FG_SIZES) {
     const dest = join(RES, dir);
     mkdirSync(dest, { recursive: true });
@@ -177,7 +168,7 @@ async function run() {
   await sharp(iconBuf).resize(512, 512).png().toFile(join(icons, 'icon-512.png'));
   console.log('✓ PWA icons (192 + 512)');
 
-  console.log('\n✅ All assets generated successfully!');
+  console.log('\n✅ All assets generated!');
 }
 
 run().catch(e => { console.error(e); process.exit(1); });

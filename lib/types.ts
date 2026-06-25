@@ -16,6 +16,7 @@ export interface Candidate {
   gender: Gender | null;
   image_url: string;
   email: string | null;
+  employee_code: string | null;
   is_finalist: number;
   created_at: string;
 }
@@ -38,6 +39,7 @@ export interface SessionUser {
   id: number;
   email: string;
   name: string;
+  employee_code?: string;
   isAdmin: boolean;
 }
 

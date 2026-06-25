@@ -2,15 +2,16 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import { getAppState } from '@/lib/db';
-import ScanModule from '@/components/admin/ScanModule';
+import { getAppState, listEmployees } from '@/lib/db';
+import EmployeesModule from '@/components/admin/EmployeesModule';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminScanPage() {
+export default async function AdminEmployeesPage() {
   const session = await getSession();
-  if (!session) redirect('/login');
-  if (!session.isAdmin) redirect('/');
+  if (!session?.isAdmin) redirect('/login');
+
+  const employees = listEmployees();
 
   return (
     <>
@@ -18,10 +19,10 @@ export default async function AdminScanPage() {
       <main className="max-w-2xl mx-auto px-4 pt-4 pb-24">
         <div className="mb-4">
           <Link href="/admin" className="text-sm font-semibold text-brand-600 hover:text-brand-700">← All modules</Link>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">📍 Attendance</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Configure venue location. Employees self check-in from their profile using GPS — within the allowed radius only.</p>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">👥 Employee Roster</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Only employees added here can log in. Upload photo, set employee code, name and email.</p>
         </div>
-        <ScanModule />
+        <EmployeesModule initial={employees} />
       </main>
     </>
   );
