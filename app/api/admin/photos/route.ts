@@ -30,19 +30,17 @@ export async function POST(req: Request) {
       if (bad) return NextResponse.json({ error: 'Invalid photo URL' }, { status: 400 });
     }
 
-    const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
     const ids = urls.map(url =>
       addPhotoPreApproved(adminOrErr.id, adminOrErr.name, url, caption ?? null, null)
     );
 
+    // Generate thumbnails in background — don't block the response.
+    // Face tagging is intentionally skipped here: for bulk uploads the admin
+    // should click "Tag All Approved Photos" once done, rather than hammering
+    // the face service with N simultaneous requests.
     for (const id of ids) {
       const photo = getPhotoById(id);
       if (photo) generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
-      fetch(`${base}/api/faces/tag-photo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Cookie: req.headers.get('Cookie') ?? '' },
-        body: JSON.stringify({ photo_id: id }),
-      }).catch(() => {});
     }
 
     return NextResponse.json({ uploaded: ids.length });

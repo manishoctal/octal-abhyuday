@@ -347,7 +347,7 @@ function AdminUploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => voi
                 <div className="h-2 bg-green-500 rounded-full transition-all duration-300" style={{ width: `${overallPct}%` }} />
               </div>
               <div className="flex justify-between text-xs text-slate-500">
-                <span>{doneCount} done · {uploadingCount} uploading · {errorCount} errors</span>
+                <span>{doneCount} / {files.length} done{errorCount > 0 ? ` · ${errorCount} errors` : ''}</span>
                 <span>{overallPct}%</span>
               </div>
             </>

@@ -12,6 +12,13 @@ Threshold guide for buffalo_l cosine similarity:
   < 0.15  — different people
 """
 
+# On Windows, asyncio defaults to SelectorEventLoop which hits a 512-fd limit
+# under concurrent load. ProactorEventLoop uses Windows IOCP with no fd limit.
+import sys
+if sys.platform == "win32":
+    import asyncio
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import numpy as np
@@ -19,6 +26,7 @@ from PIL import Image
 import requests
 import io
 import logging
+import threading
 from insightface.app import FaceAnalysis
 
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +44,10 @@ face_app.prepare(ctx_id=-1, det_size=(640, 640))
 # Lower detection threshold so faces at angles/in groups are not missed
 face_app.models["detection"].det_thresh = 0.35
 log.info("InsightFace buffalo_l model loaded.")
+
+# Cap concurrent face analyses — the model is CPU-bound so running more than
+# this in parallel just queues behind the GIL anyway and wastes file descriptors.
+_face_sem = threading.Semaphore(4)
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +129,8 @@ def embed_from_url(req: EmbedUrlRequest):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not fetch image: {e}")
 
-    faces = face_app.get(img)
+    with _face_sem:
+        faces = face_app.get(img)
     if not faces:
         log.info(f"No face detected in {req.url}")
         return EmbedResponse(embedding=[], face_found=False)
@@ -136,7 +149,8 @@ async def embed_from_upload(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not decode image: {e}")
 
-    faces = face_app.get(img)
+    with _face_sem:
+        faces = face_app.get(img)
     if not faces:
         log.info("No face detected in uploaded selfie")
         return EmbedResponse(embedding=[], face_found=False)
@@ -156,7 +170,8 @@ def embed_all_from_url(req: EmbedUrlRequest):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not fetch image: {e}")
 
-    faces = face_app.get(img)
+    with _face_sem:
+        faces = face_app.get(img)
     log.info(f"Detected {len(faces)} face(s) in {req.url}")
     return EmbedAllResponse(
         embeddings=[f.embedding.tolist() for f in faces],
