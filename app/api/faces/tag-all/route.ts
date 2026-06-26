@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { listPhotos, getAllFaceEmbeddings, addPhotoTag } from '@/lib/db';
 
 const FACE_SERVICE = process.env.FACE_SERVICE_URL ?? 'http://localhost:8001';
-const THRESHOLD = 0.45;
+const THRESHOLD = 0.28;
 
 export async function POST() {
   const session = await getSession();

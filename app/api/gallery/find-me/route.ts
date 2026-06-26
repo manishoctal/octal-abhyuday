@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   }
 
   // Step 2: cosine similarity in Node — 108 employees × 512 floats is ~1ms
-  const matches = cosineSimilaritySearch(embedRes.embedding, allEmbeddings, 0.50);
+  const matches = cosineSimilaritySearch(embedRes.embedding, allEmbeddings, 0.28);
 
   if (!matches.length) {
     return NextResponse.json({ ok: true, photos: [], message: 'No matching photos found. Make sure your profile photo is registered.' });

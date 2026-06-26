@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { requireUser, requireAdmin, isErrorResponse } from '@/lib/api-helpers';
-import { listPhotos, listUserPhotos, addPhoto, approvePhoto, rejectPhoto } from '@/lib/db';
+import { listPhotos, listUserPhotos, addPhoto, disablePhoto, enablePhoto, deletePhoto, getPhotoById } from '@/lib/db';
+import { deleteS3Object, isS3Configured } from '@/lib/s3';
+import { generateThumbnailAsync } from '@/lib/thumbnails';
 import fs from 'fs';
 import path from 'path';
+
+const DATA_DIR = () => process.env.DATA_DIR || path.join(process.cwd(), 'data');
 
 export const dynamic = 'force-dynamic';
 
@@ -46,14 +50,25 @@ export async function POST(req: Request) {
       if (bad) return NextResponse.json({ error: 'Invalid photo URL' }, { status: 400 });
     }
 
+    const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
     const results = urls.map(url => ({
       id: addPhoto(userOrErr.id, userOrErr.name, url, null, null),
       url,
     }));
+    for (const { id, url } of results) {
+      const photo = getPhotoById(id)!;
+      // fire-and-forget: thumbnail + face tagging
+      generateThumbnailAsync({ ...photo, url }, DATA_DIR()).catch(() => {});
+      fetch(`${base}/api/faces/tag-photo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_id: id }),
+      }).catch(() => {});
+    }
     return NextResponse.json({ uploaded: results.length, results });
   }
 
-  /* ── Local disk path: store files on server ── */
+  /* ── Local disk path ── */
   const formData = await req.formData();
   const files    = formData.getAll('files') as File[];
 
@@ -63,10 +78,10 @@ export async function POST(req: Request) {
   const oversized = files.find(f => f.size > MAX_SIZE);
   if (oversized) return NextResponse.json({ error: `"${oversized.name}" exceeds 5 MB limit` }, { status: 400 });
 
-  const dataDir    = process.env.DATA_DIR || path.join(process.cwd(), 'data');
-  const uploadsDir = path.join(dataDir, 'uploads');
+  const uploadsDir = path.join(DATA_DIR(), 'uploads');
   fs.mkdirSync(uploadsDir, { recursive: true });
 
+  const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
   const results: { id: number; url: string }[] = [];
   for (const file of files) {
     const rawExt  = (file.name.split('.').pop() ?? 'jpg').toLowerCase();
@@ -74,7 +89,15 @@ export async function POST(req: Request) {
     const filename = `${Date.now()}-${userOrErr.id}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
     fs.writeFileSync(path.join(uploadsDir, filename), Buffer.from(await file.arrayBuffer()));
     const url = `/uploads/${filename}`;
-    results.push({ id: addPhoto(userOrErr.id, userOrErr.name, url, null, null), url });
+    const id = addPhoto(userOrErr.id, userOrErr.name, url, null, null);
+    results.push({ id, url });
+    const photo = getPhotoById(id)!;
+    generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
+    fetch(`${base}/api/faces/tag-photo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo_id: id }),
+    }).catch(() => {});
   }
 
   return NextResponse.json({ uploaded: results.length, results });
@@ -85,19 +108,42 @@ export async function PATCH(req: Request) {
   if (isErrorResponse(adminOrErr)) return adminOrErr;
   const { id, action } = await req.json();
   if (typeof id !== 'number') return NextResponse.json({ error: 'id required' }, { status: 400 });
-  if (action === 'approve') {
-    approvePhoto(id);
-    // Fire-and-forget face tagging — doesn't block the admin response
-    const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-    fetch(`${base}/api/faces/tag-photo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: req.headers.get('Cookie') ?? '' },
-      body: JSON.stringify({ photo_id: id }),
-    }).catch(() => { /* face service offline — silently skip */ });
-  } else if (action === 'reject') {
-    rejectPhoto(id);
+  if (action === 'disable') {
+    disablePhoto(id);
+  } else if (action === 'enable') {
+    enablePhoto(id);
   } else {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: Request) {
+  const { id } = await req.json().catch(() => ({}));
+  if (typeof id !== 'number') return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  // Admins can delete any photo; users can only delete their own
+  const userOrErr = await requireUser();
+  if (isErrorResponse(userOrErr)) return userOrErr;
+
+  const photo = getPhotoById(id);
+  if (!photo) return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+
+  if (!userOrErr.isAdmin && photo.uploader_id !== userOrErr.id) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
+
+  // Delete from S3 (fire and forget — DB delete still happens even if S3 fails)
+  if (isS3Configured() && photo.url.startsWith('http')) {
+    deleteS3Object(photo.url).catch(() => {});
+  } else if (photo.url.startsWith('/uploads/')) {
+    // Local disk fallback
+    const filePath = path.join(process.env.DATA_DIR || path.join(process.cwd(), 'data'), photo.url);
+    try { fs.unlinkSync(filePath); } catch { /* already gone */ }
+  }
+
+  // Delete from DB — photo_tags cascade automatically
+  deletePhoto(id);
+
   return NextResponse.json({ ok: true });
 }

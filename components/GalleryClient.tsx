@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, Clock, Info, CloudUpload, AlertCircle, ScanFace } from 'lucide-react';
+import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, Info, CloudUpload, AlertCircle, ScanFace, Loader2 } from 'lucide-react';
 import { useRealtime } from './useRealtime';
 import type { Photo } from '@/lib/db';
 
@@ -76,15 +76,12 @@ function xhrUpload(
   });
 }
 
-/* ── status dot overlay ───────────────────────────────────── */
+/* ── status dot — only shown when admin has hidden the photo ── */
 function StatusDot({ approved }: { approved: number }) {
-  if (approved === 1) return null;
+  if (approved !== -1) return null;
   return (
     <div className="absolute inset-0 flex items-end justify-start p-1.5 pointer-events-none">
-      {approved === -1
-        ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/90 text-white backdrop-blur-sm">Rejected</span>
-        : <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/90 text-amber-900 backdrop-blur-sm">Pending</span>
-      }
+      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-700/80 text-white backdrop-blur-sm">Hidden</span>
     </div>
   );
 }
@@ -282,7 +279,7 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
           </div>
           <p className="font-bold text-slate-900 text-2xl">Uploaded!</p>
           <p className="text-slate-500 text-sm mt-3 leading-relaxed">
-            Your photos are pending admin approval and will appear in the gallery shortly.
+            Your photos are now live in the gallery.
           </p>
           <button onClick={onClose} className="btn-primary mt-7">Back to Gallery</button>
         </div>
@@ -474,6 +471,8 @@ export default function GalleryClient({
   const [lightboxPhotos, setLightboxPhotos] = useState<Photo[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [showUpload, setShowUpload]       = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingId, setDeletingId]           = useState<number | null>(null);
 
   const { data: allData,  mutate: mutateAll  } = useSWR('/api/photos',        fetcher, { fallbackData: { photos: initialApproved }, refreshInterval: 20000 });
   const { data: mineData, mutate: mutateMine } = useSWR('/api/photos?mine=1', fetcher, { fallbackData: { photos: initialMine },    refreshInterval: 20000 });
@@ -482,9 +481,21 @@ export default function GalleryClient({
   const approved: Photo[] = allData?.photos  ?? initialApproved;
   const mine:     Photo[] = mineData?.photos ?? initialMine;
   const photos            = filter === 'mine' ? mine : approved;
-  const pendingCount      = mine.filter(p => p.approved === 0).length;
-  const onUploadDone      = useCallback(() => { mutateAll(); mutateMine(); }, [mutateAll, mutateMine]);
-  const groups            = groupByDay(photos);
+  const onUploadDone = useCallback(() => { mutateAll(); mutateMine(); }, [mutateAll, mutateMine]);
+  const groups = groupByDay(photos);
+
+  async function deletePhoto(id: number) {
+    setConfirmDeleteId(null);
+    setDeletingId(id);
+    await fetch('/api/photos', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    setDeletingId(null);
+    mutateMine();
+    mutateAll();
+  }
 
   function openLightbox(groupPhotos: Photo[], idx: number) {
     setLightboxPhotos(groupPhotos);
@@ -493,6 +504,33 @@ export default function GalleryClient({
 
   return (
     <>
+      {/* ── Delete confirmation ── */}
+      {confirmDeleteId !== null && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+                <X size={18} className="text-red-600" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900">Delete Photo?</p>
+                <p className="text-sm text-slate-500 mt-1">This will permanently remove it from the gallery and S3. This cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 py-2.5 rounded-2xl font-bold text-sm border border-slate-200 text-slate-600">
+                Cancel
+              </button>
+              <button onClick={() => deletePhoto(confirmDeleteId)}
+                className="flex-1 py-2.5 rounded-2xl font-bold text-sm text-white bg-red-500">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Sticky filter bar ── */}
       <div className="sticky top-14 z-30 bg-white border-b border-slate-100 -mx-4 px-4 py-2 flex gap-2">
         {(['all', 'mine'] as Filter[]).map(f => (
@@ -510,13 +548,6 @@ export default function GalleryClient({
         </button>
       </div>
 
-      {/* ── Pending notice ── */}
-      {filter === 'mine' && pendingCount > 0 && (
-        <div className="flex items-center gap-2 mt-3 px-4 py-2.5 rounded-2xl text-xs font-semibold" style={{ background: '#FEF3C7', color: '#92400E' }}>
-          <Clock size={13} strokeWidth={2} />
-          {pendingCount} photo{pendingCount > 1 ? 's' : ''} awaiting admin approval
-        </div>
-      )}
 
       {/* ── Empty state ── */}
       {photos.length === 0 && (
@@ -547,9 +578,20 @@ export default function GalleryClient({
                   <button key={p.id} onClick={() => openLightbox(group.photos, i)}
                     className="relative aspect-square overflow-hidden bg-slate-100 active:opacity-80 transition-opacity">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt={p.caption ?? ''} className="w-full h-full object-cover" loading="lazy"
-                      style={p.approved !== 1 ? { filter: 'brightness(0.65)' } : undefined} />
+                    <img src={p.thumbnail_url ?? p.url} alt={p.caption ?? ''} className="w-full h-full object-cover" loading="lazy"
+                      style={p.approved === -1 ? { filter: 'brightness(0.5) grayscale(0.5)' } : undefined} />
                     {filter === 'mine' && <StatusDot approved={p.approved} />}
+                    {filter === 'mine' && (
+                      <button
+                        onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
+                        disabled={deletingId === p.id}
+                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center disabled:opacity-40"
+                      >
+                        {deletingId === p.id
+                          ? <Loader2 size={13} color="white" className="animate-spin" />
+                          : <X size={13} color="white" strokeWidth={2.5} />}
+                      </button>
+                    )}
                   </button>
                 ))}
               </div>

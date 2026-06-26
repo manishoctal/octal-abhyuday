@@ -6,6 +6,7 @@ import { Camera, Download, Loader2, AlertTriangle, CheckCircle2, ImageOff, Refre
 interface Photo {
   id: number;
   url: string;
+  thumbnail_url: string | null;
   caption: string | null;
   session_tag: string | null;
   uploaded_at: string;
@@ -160,7 +161,7 @@ export default function MyPhotosClient() {
             {photos.map(photo => (
               <div key={photo.id} className="relative break-inside-avoid rounded-2xl overflow-hidden group border border-slate-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.url} alt={photo.caption ?? 'Event photo'} className="w-full object-cover" />
+                <img src={photo.thumbnail_url ?? photo.url} alt={photo.caption ?? 'Event photo'} className="w-full object-cover" loading="lazy" />
 
                 {/* Overlay on hover/touch */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity flex items-end p-3">

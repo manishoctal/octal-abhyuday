@@ -678,6 +678,16 @@ try {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_points_user_activity ON points(user_id, activity)');
 } catch { /* duplicates already exist — safe to ignore, INSERT OR IGNORE will handle dedup */ }
 
+// Add thumbnail_url to photos if missing
+{
+  const photoCols = (db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]).map(c => c.name);
+  if (!photoCols.includes('thumbnail_url')) {
+    db.exec('ALTER TABLE photos ADD COLUMN thumbnail_url TEXT');
+  }
+}
+// Promote legacy pending photos (approved=0) to visible (approved=1)
+db.prepare('UPDATE photos SET approved=1 WHERE approved=0').run();
+
 // ---------- awards ----------
 
 export interface AwardCategory {
@@ -779,7 +789,14 @@ export function getTagsForPhoto(photoId: number) {
 
 export interface Photo {
   id: number; uploader_id: number; uploader_name: string; url: string;
-  caption: string | null; session_tag: string | null; approved: number; uploaded_at: string;
+  thumbnail_url: string | null; caption: string | null; session_tag: string | null;
+  approved: number; uploaded_at: string;
+}
+export function setPhotoThumbnail(id: number, thumbnailUrl: string) {
+  db.prepare('UPDATE photos SET thumbnail_url=? WHERE id=?').run(thumbnailUrl, id);
+}
+export function listPhotosWithoutThumbnail(): Photo[] {
+  return db.prepare('SELECT * FROM photos WHERE thumbnail_url IS NULL AND approved != -1 ORDER BY id DESC').all() as Photo[];
 }
 
 export function getPhotoById(id: number): Photo | undefined {
@@ -798,16 +815,29 @@ export function listUserPhotos(userId: number): Photo[] {
   return db.prepare('SELECT * FROM photos WHERE uploader_id=? ORDER BY uploaded_at DESC').all(userId) as Photo[];
 }
 export function addPhoto(uploaderId: number, uploaderName: string, url: string, caption: string | null, sessionTag: string | null) {
-  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag) VALUES (?,?,?,?,?)').run(uploaderId, uploaderName, url, caption, sessionTag);
+  // Auto-approved — no moderation queue for user uploads
+  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag, approved) VALUES (?,?,?,?,?,1)').run(uploaderId, uploaderName, url, caption, sessionTag);
   awardPoints(uploaderId, 'uploaded_photo', 15);
   return r.lastInsertRowid as number;
 }
-export function approvePhoto(id: number) {
+export function addPhotoPreApproved(uploaderId: number, uploaderName: string, url: string, caption: string | null, sessionTag: string | null) {
+  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag, approved) VALUES (?,?,?,?,?,1)').run(uploaderId, uploaderName, url, caption, sessionTag);
+  return r.lastInsertRowid as number;
+}
+export function disablePhoto(id: number) {
+  db.prepare('UPDATE photos SET approved=-1 WHERE id=?').run(id);
+}
+export function enablePhoto(id: number) {
   db.prepare('UPDATE photos SET approved=1 WHERE id=?').run(id);
 }
-export function rejectPhoto(id: number) {
-  // approved=-1 keeps the record visible to the uploader with "Rejected" status
-  db.prepare('UPDATE photos SET approved=-1 WHERE id=?').run(id);
+export function deletePhoto(id: number) {
+  db.prepare('DELETE FROM photos WHERE id=?').run(id);
+}
+/** Returns all photo + thumbnail URLs, then wipes the photos table (photo_tags cascade). */
+export function deleteAllPhotos(): { url: string; thumbnail_url: string | null }[] {
+  const rows = db.prepare('SELECT url, thumbnail_url FROM photos').all() as { url: string; thumbnail_url: string | null }[];
+  db.prepare('DELETE FROM photos').run();
+  return rows;
 }
 
 // ---------- feedback ----------
