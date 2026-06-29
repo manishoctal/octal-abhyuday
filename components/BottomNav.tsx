@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import useSWR from 'swr';
 import { Home, CalendarDays, Zap, ImageIcon, User } from 'lucide-react';
 import { useRealtime } from './useRealtime';
+import { usePushRegistration } from './usePushRegistration';
 
 const fetcher = (u: string) => fetch(u).then(r => r.json());
 
@@ -12,6 +13,7 @@ export default function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   const path = usePathname();
   const { data } = useSWR('/api/state', fetcher, { refreshInterval: 30000 });
   useRealtime(['/api/state']);
+  usePushRegistration();
 
   const isLive = data?.state?.voting_state === 'live' || data?.state?.voting_state === 'paused';
 

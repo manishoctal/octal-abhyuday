@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "563954713249",
+    "project_id": "abhyuday-e8c1d",
+    "storage_bucket": "abhyuday-e8c1d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:563954713249:android:d1d42881c782491adca6e0",
+        "android_client_info": {
+          "package_name": "com.octalsoftware.abhyuday"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAz0aeEYezqXaRpyH_-aZ1i6zcqgQVufgY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
