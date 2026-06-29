@@ -33,7 +33,12 @@ export async function POST(req: Request) {
   );
   startSession(qaSession.id);
   pushQuestionLive(question.id);
-  broadcast('qa');
+
+  const alertMap: Record<string, Parameters<typeof broadcast>[1]> = {
+    poll:    { kind: 'poll_live',    title: '📊 New Poll is Live!',    body: prompt.trim().slice(0, 80) },
+    ranking: { kind: 'ranking_live', title: '🏅 New Ranking is Live!', body: prompt.trim().slice(0, 80) },
+  };
+  broadcast('qa', alertMap[kind]);
 
   return NextResponse.json({ ok: true, sessionId: qaSession.id, questionId: question.id });
 }

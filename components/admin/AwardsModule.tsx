@@ -93,6 +93,7 @@ export default function AdminAwardsModule({ initial }: Props) {
   const [newCatDesc, setNewCatDesc] = useState('');
   const [expanded, setExpanded] = useState<number | null>(null);
   const [saving, setSaving]     = useState(false);
+  const [error,  setError]      = useState('');
 
   useEffect(() => {
     fetch('/api/users').then(r => r.json()).then(d => setEmp(d.users ?? []));
@@ -104,7 +105,14 @@ export default function AdminAwardsModule({ initial }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...extra }),
     });
-    return res.json();
+    const text = await res.text();
+    try {
+      const data = JSON.parse(text);
+      if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`);
+      return data;
+    } catch {
+      throw new Error(`Awards API error (${res.status}): ${text.slice(0, 200) || 'empty response'}`);
+    }
   }
 
   async function refresh() {
@@ -143,17 +151,32 @@ export default function AdminAwardsModule({ initial }: Props) {
   }
 
   async function announceWinner(catId: number, nomineeId: number) {
-    await api('announce_winner', { category_id: catId, nominee_id: nomineeId });
-    await refresh();
+    try {
+      await api('announce_winner', { category_id: catId, nominee_id: nomineeId });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to set winner');
+      setTimeout(() => setError(''), 5000);
+    }
   }
 
   async function clearWinner(catId: number) {
-    await api('clear_winner', { category_id: catId });
-    await refresh();
+    try {
+      await api('clear_winner', { category_id: catId });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to clear winner');
+      setTimeout(() => setError(''), 5000);
+    }
   }
 
   return (
     <div className="space-y-5">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-semibold px-4 py-3 rounded-xl">
+          ⚠️ {error}
+        </div>
+      )}
       {/* Create category */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">

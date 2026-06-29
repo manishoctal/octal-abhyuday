@@ -1,20 +1,16 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
-import Header from '@/components/Header';
-import { getAppState, listFeedback } from '@/lib/db';
+import { listFeedback } from '@/lib/db';
 import AdminFeedbackModule from '@/components/admin/FeedbackModule';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminFeedbackPage() {
-  const session = await getSession();
-  if (!session?.isAdmin) redirect('/');
+export default function AdminFeedbackPage() {
   return (
-    <>
-      <Header eventName={getAppState().event_name} title="Feedback" isAdmin back="/admin" />
-      <main className="max-w-2xl mx-auto px-4 pt-4 pb-8">
-        <AdminFeedbackModule initial={listFeedback()} />
-      </main>
-    </>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold text-slate-900">⭐ Feedback</h1>
+        <p className="text-sm text-slate-500 mt-1">View all attendee feedback, average ratings, and export responses as CSV.</p>
+      </div>
+      <AdminFeedbackModule initial={listFeedback()} />
+    </div>
   );
 }

@@ -25,14 +25,15 @@ export interface CandidateWithVotes extends Candidate {
   vote_count: number;
 }
 
-export type VotingRound = 1 | 2;
+export type VotingRound = number;
 
 export interface AppState {
   voting_state: VotingState;
   results_announced: boolean;
   event_name: string;
-  /** 1 = qualifier (pick up to 10 per gender, counts hidden); 2 = grand finale */
   voting_round: VotingRound;
+  /** Admin-configurable total number of rounds; last round is the Grand Finale */
+  total_rounds: number;
 }
 
 export interface SessionUser {

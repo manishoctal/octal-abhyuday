@@ -35,21 +35,23 @@ export async function POST(req: Request) {
   }
 
   if (action === 'announce') {
-    if (state.voting_round !== 2) {
+    if (state.voting_round !== state.total_rounds) {
       return NextResponse.json(
-        { error: 'Results are announced in the finale (round 2)' },
+        { error: `Results can only be announced in the Grand Finale (round ${state.total_rounds})` },
         { status: 409 }
       );
     }
     setSetting('results_announced', '1');
   } else if (action === 'back_to_round1') {
-    if (state.voting_round !== 2) {
+    if (state.voting_round <= 1) {
       return NextResponse.json({ error: 'Already in round 1' }, { status: 409 });
     }
-    // Round-1 voting reopens paused; ending it again re-runs the auto-promotion
+    // Reset to round 1 (paused) — ending it again re-runs promotion
     setSetting('voting_round', '1');
     setSetting('voting_state', 'paused');
     setSetting('results_announced', '0');
+    // Clear finalist flags so round 1 shows all candidates
+    db.prepare('UPDATE candidates SET is_finalist = 0').run();
   } else if (action === 'reset') {
     // Full reset to a fresh round-1 qualifier: clears votes, finalists and announcement
     setSetting('voting_state', 'not_started');
@@ -61,6 +63,14 @@ export async function POST(req: Request) {
     setSetting('voting_state', t.to!);
   }
 
-  broadcast('state');
+  const ALERTS: Partial<Record<Action, Parameters<typeof broadcast>[1]>> = {
+    start:    { kind: 'voting_live',        title: '🗳️ Voting is open!',       body: 'Cast your vote now before it closes.' },
+    resume:   { kind: 'voting_live',        title: '🗳️ Voting resumed!',        body: 'Voting is live again — cast your vote.' },
+    pause:    { kind: 'voting_paused',      title: '⏸️ Voting paused',          body: 'Hold tight — voting will resume shortly.' },
+    end:      { kind: 'voting_ended',       title: '🏁 Voting has closed',      body: 'Votes are in! Results coming soon.' },
+    announce: { kind: 'results_announced',  title: '🎉 Results Announced!',     body: 'The winners of ABHYUDAY 2026 are revealed!' },
+  };
+
+  broadcast('state', ALERTS[action]);
   return NextResponse.json({ ok: true, state: getAppState() });
 }

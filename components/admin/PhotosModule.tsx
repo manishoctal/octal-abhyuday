@@ -1,8 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { ScanFace, Users, CheckCircle2, Loader2, AlertTriangle, Trash2, X, ChevronLeft, ChevronRight, Upload, ImagePlus, Sparkles, TriangleAlert } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  ScanFace, Users, CheckCircle2, Loader2, AlertTriangle, Trash2, X,
+  ChevronLeft, ChevronRight, Upload, ImagePlus, Sparkles, TriangleAlert,
+  Eye, EyeOff, ChevronDown, ChevronUp, FilterX,
+} from 'lucide-react';
 import type { Photo } from '@/lib/db';
+import FaceFinder from './FaceFinder';
 
 /* ── Lightbox ────────────────────────────────────────────── */
 function Lightbox({ photos, index, onClose, onPrev, onNext, onDelete }: {
@@ -14,18 +19,27 @@ function Lightbox({ photos, index, onClose, onPrev, onNext, onDelete }: {
   onDelete: (id: number) => void;
 }) {
   const photo = photos[index];
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') onPrev();
+      if (e.key === 'ArrowRight') onNext();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, onPrev, onNext]);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col" onClick={onClose}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between px-5 py-3 shrink-0" onClick={e => e.stopPropagation()}>
         <div>
-          <p className="text-white font-semibold text-sm">{photo.uploader_name}</p>
-          {photo.caption && <p className="text-white/50 text-xs">{photo.caption}</p>}
+          <p className="text-white font-semibold">{photo.uploader_name}</p>
+          {photo.caption && <p className="text-white/50 text-sm">{photo.caption}</p>}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => onDelete(photo.id)}
-            className="w-9 h-9 rounded-full bg-red-500/20 hover:bg-red-500 flex items-center justify-center transition-colors">
-            <Trash2 size={16} className="text-red-400 hover:text-white" />
+            className="w-9 h-9 rounded-full bg-red-500/20 hover:bg-red-500 flex items-center justify-center transition-colors group">
+            <Trash2 size={15} className="text-red-400 group-hover:text-white" />
           </button>
           <button onClick={onClose}
             className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
@@ -34,33 +48,29 @@ function Lightbox({ photos, index, onClose, onPrev, onNext, onDelete }: {
         </div>
       </div>
 
-      {/* Image */}
-      <div className="flex-1 flex items-center justify-center px-12 min-h-0" onClick={e => e.stopPropagation()}>
+      <div className="flex-1 flex items-center justify-center px-16 min-h-0" onClick={e => e.stopPropagation()}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo.url} alt={photo.caption ?? ''} className="max-h-full max-w-full object-contain rounded-xl" />
+        <img src={photo.url} alt={photo.caption ?? ''} className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
       </div>
 
-      {/* Nav arrows */}
       {index > 0 && (
         <button onClick={e => { e.stopPropagation(); onPrev(); }}
-          className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-          <ChevronLeft size={22} className="text-white" />
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors backdrop-blur-sm">
+          <ChevronLeft size={24} className="text-white" />
         </button>
       )}
       {index < photos.length - 1 && (
         <button onClick={e => { e.stopPropagation(); onNext(); }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-          <ChevronRight size={22} className="text-white" />
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors backdrop-blur-sm">
+          <ChevronRight size={24} className="text-white" />
         </button>
       )}
-
-      {/* Counter */}
-      <p className="text-center text-white/40 text-xs py-3 shrink-0">{index + 1} / {photos.length}</p>
+      <p className="text-center text-white/30 text-xs py-3 shrink-0">{index + 1} / {photos.length}</p>
     </div>
   );
 }
 
-/* ── Confirmation dialog ─────────────────────────────────── */
+/* ── Confirm delete dialog ───────────────────────────────── */
 function ConfirmDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -71,111 +81,195 @@ function ConfirmDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCance
           </div>
           <div>
             <p className="font-bold text-slate-900">Delete Photo?</p>
-            <p className="text-sm text-slate-500 mt-1">This will permanently delete the photo.</p>
+            <p className="text-sm text-slate-500 mt-1">This permanently removes the photo from the gallery.</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={onCancel}
-            className="flex-1 py-2.5 rounded-2xl font-bold text-sm border border-slate-200 text-slate-600">
-            Cancel
-          </button>
-          <button onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-2xl font-bold text-sm text-white bg-red-500">
-            Delete
-          </button>
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-2xl font-bold text-sm border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-2xl font-bold text-sm text-white bg-red-500 hover:bg-red-600">Delete</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Face Matching + Thumbnail panel ────────────────────── */
-function FaceMatchingPanel() {
-  const [regStatus,   setRegStatus]   = useState('');
-  const [tagStatus,   setTagStatus]   = useState('');
-  const [thumbStatus, setThumbStatus] = useState('');
-  const [regLoading,  setRegLoading]  = useState(false);
-  const [tagLoading,  setTagLoading]  = useState(false);
-  const [thumbLoading,setThumbLoading]= useState(false);
+/* ── Processing sidebar panel ────────────────────────────── */
+interface ThumbStats { missing: number }
+interface FaceRegStats { total_with_photo: number; registered: number }
+interface FaceTagStats { approved_photos: number; photo_tags: number }
+
+function StatusPill({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+      {ok ? <CheckCircle2 size={10} /> : <AlertTriangle size={10} />}
+      {children}
+    </span>
+  );
+}
+
+function ProcessingPanel() {
+  const [thumbStats,   setThumbStats]   = useState<ThumbStats | null>(null);
+  const [regStats,     setRegStats]     = useState<FaceRegStats | null>(null);
+  const [tagStats,     setTagStats]     = useState<FaceTagStats | null>(null);
+  const [actionMsg,    setActionMsg]    = useState<{ text: string; ok: boolean } | null>(null);
+  const [regLoading,   setRegLoading]   = useState(false);
+  const [tagLoading,   setTagLoading]   = useState(false);
+  const [thumbLoading, setThumbLoading] = useState(false);
+  const [expanded,     setExpanded]     = useState(true);
+
+  async function loadStats() {
+    const [t, r, g] = await Promise.all([
+      fetch('/api/admin/photos/thumbnails').then(r => r.ok ? r.json() : null),
+      fetch('/api/faces/register-all').then(r => r.ok ? r.json() : null),
+      fetch('/api/faces/tag-all').then(r => r.ok ? r.json() : null),
+    ]);
+    if (t) setThumbStats({ missing: t.missing });
+    if (r) setRegStats(r);
+    if (g) setTagStats(g);
+  }
+
+  useEffect(() => { loadStats(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function notify(text: string, ok: boolean) {
+    setActionMsg({ text, ok });
+    setTimeout(() => setActionMsg(null), 5000);
+  }
+
+  async function generateThumbs() {
+    setThumbLoading(true);
+    try {
+      const res = await fetch('/api/admin/photos/thumbnails', { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok) { notify(`Error: ${d.error}`, false); return; }
+      notify(d.queued > 0 ? `Generating ${d.queued} thumbnails in background…` : 'All thumbnails up to date.', true);
+      setTimeout(loadStats, 3000);
+    } finally { setThumbLoading(false); }
+  }
 
   async function registerAll() {
-    setRegLoading(true); setRegStatus('');
+    setRegLoading(true);
     try {
       const res = await fetch('/api/faces/register-all', { method: 'POST' });
       const d = await res.json();
-      if (!res.ok) { setRegStatus(`Error: ${d.error}`); return; }
-      setRegStatus(`Done — ${d.registered} registered, ${d.skipped} no face, ${d.failed} failed (of ${d.total})`);
+      if (!res.ok) { notify(`Error: ${d.error}`, false); return; }
+      notify(`Done — ${d.registered} indexed, ${d.skipped} no face, ${d.failed} failed`, true);
+      await loadStats();
     } finally { setRegLoading(false); }
   }
 
   async function tagAll() {
-    setTagLoading(true); setTagStatus('');
+    setTagLoading(true);
     try {
       const res = await fetch('/api/faces/tag-all', { method: 'POST' });
       const d = await res.json();
-      if (!res.ok) { setTagStatus(`Error: ${d.error}`); return; }
-      setTagStatus(`Done — ${d.tags_written} tags across ${d.photos_processed} photos`);
+      if (!res.ok) { notify(`Error: ${d.error}`, false); return; }
+      notify(`Done — ${d.tags_written} tags across ${d.photos_processed} photos`, true);
+      await loadStats();
     } finally { setTagLoading(false); }
   }
 
-  async function generateThumbs() {
-    setThumbLoading(true); setThumbStatus('');
-    try {
-      const res = await fetch('/api/admin/photos/thumbnails', { method: 'POST' });
-      const d = await res.json();
-      if (!res.ok) { setThumbStatus(`Error: ${d.error}`); return; }
-      setThumbStatus(d.queued > 0 ? `Generating thumbnails for ${d.queued} photos in background…` : 'All photos already have thumbnails.');
-    } finally { setThumbLoading(false); }
-  }
+  const thumbOk = thumbStats?.missing === 0;
+  const regOk   = regStats != null && regStats.registered >= regStats.total_with_photo && regStats.total_with_photo > 0;
+  const tagOk   = tagStats != null && tagStats.photo_tags > 0;
+  const allOk   = thumbOk && regOk && tagOk;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
-      <div className="flex items-center gap-2">
-        <ScanFace size={16} className="text-slate-400" />
-        <h2 className="font-bold text-slate-900">Processing</h2>
-      </div>
-      <p className="text-xs text-slate-500">Run once for existing photos. New uploads process automatically.</p>
-      <div className="space-y-2">
-        <div className="rounded-xl border border-slate-100 p-3 space-y-2">
-          <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5"><Sparkles size={12} /> Thumbnails — faster gallery loading</p>
-          <button onClick={generateThumbs} disabled={thumbLoading}
-            className="w-full py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2 bg-slate-700">
-            {thumbLoading ? <><Loader2 size={14} className="animate-spin" />Queuing…</> : 'Generate Thumbnails for All Photos'}
-          </button>
-          {thumbStatus && (
-            <p className={`text-[11px] font-semibold px-3 py-2 rounded-lg flex items-center gap-1 ${thumbStatus.startsWith('Error') ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'}`}>
-              {thumbStatus.startsWith('Error') ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}{thumbStatus}
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
+      >
+        <div className="flex items-center gap-2">
+          <ScanFace size={15} className="text-slate-500" />
+          <span className="font-bold text-slate-900 text-sm">Processing</span>
+          {!allOk && <span className="w-2 h-2 rounded-full bg-amber-400" />}
+          {allOk  && <span className="w-2 h-2 rounded-full bg-green-400" />}
+        </div>
+        {expanded ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3">
+          <p className="text-[11px] text-slate-400">Run once for existing photos. New uploads process automatically.</p>
+
+          {actionMsg && (
+            <p className={`text-[11px] font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 ${actionMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+              {actionMsg.ok ? <CheckCircle2 size={11} /> : <AlertTriangle size={11} />}{actionMsg.text}
             </p>
           )}
+
+          {/* Step 1: Thumbnails */}
+          <div className="rounded-xl border border-slate-100 p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={12} className="text-slate-400" />
+                <span className="text-xs font-semibold text-slate-700">Thumbnails</span>
+              </div>
+              {thumbStats == null
+                ? <span className="text-[11px] text-slate-400">…</span>
+                : thumbOk
+                  ? <StatusPill ok>All done</StatusPill>
+                  : <StatusPill ok={false}>{thumbStats.missing} missing</StatusPill>}
+            </div>
+            <button
+              onClick={generateThumbs}
+              disabled={thumbLoading || thumbOk}
+              className="w-full py-2 rounded-lg font-bold text-xs text-white bg-slate-700 hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-1.5"
+            >
+              {thumbLoading ? <><Loader2 size={12} className="animate-spin" />Queuing…</> : `Generate${thumbStats?.missing ? ` (${thumbStats.missing})` : ''}`}
+            </button>
+          </div>
+
+          {/* Step 2: Index faces */}
+          <div className="rounded-xl border border-slate-100 p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Users size={12} className="text-slate-400" />
+                <span className="text-xs font-semibold text-slate-700">Index Faces</span>
+              </div>
+              {regStats == null
+                ? <span className="text-[11px] text-slate-400">…</span>
+                : regOk
+                  ? <StatusPill ok>All {regStats.registered}</StatusPill>
+                  : <StatusPill ok={false}>{regStats.registered}/{regStats.total_with_photo}</StatusPill>}
+            </div>
+            <p className="text-[11px] text-slate-400">Build embeddings from employee profile photos.</p>
+            <button
+              onClick={registerAll}
+              disabled={regLoading}
+              className="w-full py-2 rounded-lg font-bold text-xs text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+              style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }}
+            >
+              {regLoading ? <><Loader2 size={12} className="animate-spin" />Indexing…</> : 'Index All'}
+            </button>
+          </div>
+
+          {/* Step 3: Tag photos */}
+          <div className="rounded-xl border border-slate-100 p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <ScanFace size={12} className="text-slate-400" />
+                <span className="text-xs font-semibold text-slate-700">Tag Photos</span>
+              </div>
+              {tagStats == null
+                ? <span className="text-[11px] text-slate-400">…</span>
+                : tagStats.approved_photos === 0
+                  ? <StatusPill ok>No photos yet</StatusPill>
+                  : tagOk
+                    ? <StatusPill ok>{tagStats.photo_tags} tags</StatusPill>
+                    : <StatusPill ok={false}>0 tagged</StatusPill>}
+            </div>
+            <button
+              onClick={tagAll}
+              disabled={tagLoading}
+              className="w-full py-2 rounded-lg font-bold text-xs text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+              style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}
+            >
+              {tagLoading ? <><Loader2 size={12} className="animate-spin" />Tagging…</> : 'Tag All Photos'}
+            </button>
+          </div>
         </div>
-        <div className="rounded-xl border border-slate-100 p-3 space-y-2">
-          <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5"><Users size={12} /> One-time setup — index employee profile photos</p>
-          <p className="text-[11px] text-slate-400 leading-relaxed">Builds face embeddings from employee profile photos. Runs automatically for new employees — only needed once for existing ones.</p>
-          <button onClick={registerAll} disabled={regLoading}
-            className="w-full py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }}>
-            {regLoading ? <><Loader2 size={14} className="animate-spin" />Registering…</> : 'Index All Employee Faces'}
-          </button>
-          {regStatus && (
-            <p className={`text-[11px] font-semibold px-3 py-2 rounded-lg flex items-center gap-1 ${regStatus.startsWith('Error') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
-              {regStatus.startsWith('Error') ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}{regStatus}
-            </p>
-          )}
-        </div>
-        <div className="rounded-xl border border-slate-100 p-3 space-y-2">
-          <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5"><ScanFace size={12} /> Face matching — Step 2</p>
-          <button onClick={tagAll} disabled={tagLoading}
-            className="w-full py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}>
-            {tagLoading ? <><Loader2 size={14} className="animate-spin" />Tagging…</> : 'Tag All Approved Photos'}
-          </button>
-          {tagStatus && (
-            <p className={`text-[11px] font-semibold px-3 py-2 rounded-lg flex items-center gap-1 ${tagStatus.startsWith('Error') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
-              {tagStatus.startsWith('Error') ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}{tagStatus}
-            </p>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -195,8 +289,8 @@ function xhrUpload(url: string, data: File | FormData, method: 'PUT' | 'POST', c
   });
 }
 
-const CONCURRENCY = 6; // simultaneous S3 uploads
-const BULK_THRESHOLD = 20; // switch to summary UI above this count
+const CONCURRENCY    = 6;
+const BULK_THRESHOLD = 20;
 
 type FileStatus = 'pending' | 'uploading' | 'done' | 'error';
 type FileState  = { file: File; preview: string; status: FileStatus; progress: number; error?: string };
@@ -212,14 +306,15 @@ async function runPool<T>(items: T[], concurrency: number, worker: (item: T, i: 
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, next));
 }
 
-/* ── Admin Upload Panel ──────────────────────────────────── */
-function AdminUploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => void }) {
-  const inputRef                  = useRef<HTMLInputElement>(null);
-  const [files, setFiles]         = useState<FileState[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [doneCount, setDoneCount] = useState(0);
+/* ── Upload panel ────────────────────────────────────────── */
+function UploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => void }) {
+  const inputRef                    = useRef<HTMLInputElement>(null);
+  const [files, setFiles]           = useState<FileState[]>([]);
+  const [uploading, setUploading]   = useState(false);
+  const [doneCount, setDoneCount]   = useState(0);
   const [errorCount, setErrorCount] = useState(0);
-  const [finished, setFinished]   = useState(false);
+  const [finished, setFinished]     = useState(false);
+  const [dragging, setDragging]     = useState(false);
 
   const isBulk = files.length > BULK_THRESHOLD;
 
@@ -229,9 +324,7 @@ function AdminUploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => voi
       file: f, preview: URL.createObjectURL(f), status: 'pending', progress: 0,
     }));
     setFiles(prev => [...prev, ...next]);
-    setFinished(false);
-    setDoneCount(0);
-    setErrorCount(0);
+    setFinished(false); setDoneCount(0); setErrorCount(0);
   }, []);
 
   function clearAll() {
@@ -271,7 +364,6 @@ function AdminUploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => voi
           }
         });
 
-        // Register all successfully uploaded URLs in chunks of 100
         const successUrls = urls.filter(Boolean) as string[];
         for (let start = 0; start < successUrls.length; start += 100) {
           await fetch('/api/admin/photos', {
@@ -281,7 +373,6 @@ function AdminUploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => voi
           });
         }
       } else {
-        // Local: send in batches of 20 (avoid giant FormData bodies)
         const BATCH = 20;
         for (let start = 0; start < files.length; start += BATCH) {
           const batch = files.slice(start, start + BATCH);
@@ -302,106 +393,171 @@ function AdminUploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => voi
       files.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
       setFinished(true);
       onDone();
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   }
 
   const pendingCount   = files.filter(f => f.status === 'pending').length;
-  const uploadingCount = files.filter(f => f.status === 'uploading').length;
   const overallPct     = files.length > 0 ? Math.round((doneCount / files.length) * 100) : 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Upload size={16} className="text-slate-400" />
-        <h2 className="font-bold text-slate-900">Upload Photos</h2>
-        <span className="ml-auto text-xs text-slate-400">Auto-approved · visible immediately</span>
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
+        <Upload size={15} className="text-slate-400" />
+        <span className="font-bold text-slate-900 text-sm">Upload Photos</span>
+        <span className="ml-auto text-[11px] text-slate-400">Auto-approved</span>
       </div>
 
-      {/* Drop zone */}
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
-        className="w-full border-2 border-dashed border-slate-200 hover:border-slate-400 rounded-2xl py-8 flex flex-col items-center gap-2 transition-colors"
-      >
-        <ImagePlus size={28} className="text-slate-300" />
-        <p className="text-sm font-semibold text-slate-500">Tap to select or drag & drop</p>
-        <p className="text-xs text-slate-400">Up to 1,000 photos · JPG / PNG / WEBP</p>
-      </button>
-      <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
-        onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
-
-      {/* ── Bulk summary view ── */}
-      {files.length > 0 && isBulk && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-bold text-slate-800">{files.length} photos selected</span>
-            {!uploading && <button onClick={clearAll} className="text-xs text-slate-400 hover:text-red-500">Clear all</button>}
-          </div>
-          {uploading && (
-            <>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-2 bg-green-500 rounded-full transition-all duration-300" style={{ width: `${overallPct}%` }} />
-              </div>
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>{doneCount} / {files.length} done{errorCount > 0 ? ` · ${errorCount} errors` : ''}</span>
-                <span>{overallPct}%</span>
-              </div>
-            </>
-          )}
-          {errorCount > 0 && !uploading && (
-            <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-xl">
-              {errorCount} photo{errorCount > 1 ? 's' : ''} failed — rest uploaded successfully.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* ── Per-file list (small batches only) ── */}
-      {files.length > 0 && !isBulk && (
-        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-          {files.map((fs_, i) => (
-            <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-xl px-2 py-1.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={fs_.preview} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-700 truncate">{fs_.file.name}</p>
-                {fs_.status === 'uploading' && (
-                  <div className="h-1 bg-slate-200 rounded-full mt-1">
-                    <div className="h-1 bg-green-500 rounded-full transition-all" style={{ width: `${fs_.progress}%` }} />
-                  </div>
-                )}
-                {fs_.status === 'done'  && <p className="text-[10px] text-green-600 font-semibold">Uploaded</p>}
-                {fs_.status === 'error' && <p className="text-[10px] text-red-500 font-semibold">{fs_.error}</p>}
-              </div>
-              {fs_.status === 'pending'   && <button onClick={() => { URL.revokeObjectURL(fs_.preview); setFiles(prev => prev.filter((_, j) => j !== i)); }} className="text-slate-400 hover:text-red-500 shrink-0"><X size={14} /></button>}
-              {fs_.status === 'uploading' && <Loader2 size={14} className="animate-spin text-slate-400 shrink-0" />}
-              {fs_.status === 'done'      && <CheckCircle2 size={14} className="text-green-500 shrink-0" />}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {finished && (
-        <p className="text-xs font-semibold text-green-700 bg-green-50 px-3 py-2 rounded-xl flex items-center gap-1">
-          <CheckCircle2 size={13} /> {doneCount} photo{doneCount !== 1 ? 's' : ''} published to gallery.
-        </p>
-      )}
-
-      {files.length > 0 && !finished && (
+      <div className="p-4 space-y-3">
+        {/* Drop zone */}
         <button
-          onClick={upload}
-          disabled={uploading || pendingCount === 0}
-          className="w-full py-3 rounded-2xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg,#0F172A,#334155)' }}
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
+          className={`w-full border-2 border-dashed rounded-2xl py-7 flex flex-col items-center gap-2 transition-all ${
+            dragging ? 'border-brand-400 bg-brand-50' : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+          }`}
         >
-          {uploading
-            ? <><Loader2 size={15} className="animate-spin" />{doneCount}/{files.length} uploaded…</>
-            : <><Upload size={15} />Upload {files.length} photo{files.length !== 1 ? 's' : ''}</>}
+          <ImagePlus size={26} className={dragging ? 'text-brand-500' : 'text-slate-300'} />
+          <p className="text-sm font-semibold text-slate-500">
+            {dragging ? 'Drop to upload' : 'Click or drag & drop'}
+          </p>
+          <p className="text-xs text-slate-400">Up to 1,000 photos · JPG / PNG / WEBP</p>
         </button>
+        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
+          onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+
+        {/* Bulk summary */}
+        {files.length > 0 && isBulk && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-bold text-slate-800">{files.length} photos selected</span>
+              {!uploading && <button onClick={clearAll} className="text-xs text-slate-400 hover:text-red-500">Clear</button>}
+            </div>
+            {uploading && (
+              <>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${overallPct}%` }} />
+                </div>
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>{doneCount}/{files.length} done{errorCount > 0 ? ` · ${errorCount} errors` : ''}</span>
+                  <span>{overallPct}%</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Per-file list (small batches) */}
+        {files.length > 0 && !isBulk && (
+          <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            {files.map((fs_, i) => (
+              <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-xl px-2 py-1.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={fs_.preview} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-700 truncate">{fs_.file.name}</p>
+                  {fs_.status === 'uploading' && (
+                    <div className="h-1 bg-slate-200 rounded-full mt-1">
+                      <div className="h-1 bg-green-500 rounded-full transition-all" style={{ width: `${fs_.progress}%` }} />
+                    </div>
+                  )}
+                  {fs_.status === 'done'  && <p className="text-[10px] text-green-600 font-semibold">Uploaded ✓</p>}
+                  {fs_.status === 'error' && <p className="text-[10px] text-red-500 font-semibold">{fs_.error}</p>}
+                </div>
+                {fs_.status === 'pending' && (
+                  <button onClick={() => { URL.revokeObjectURL(fs_.preview); setFiles(prev => prev.filter((_, j) => j !== i)); }}
+                    className="text-slate-400 hover:text-red-500 shrink-0"><X size={13} /></button>
+                )}
+                {fs_.status === 'uploading' && <Loader2 size={13} className="animate-spin text-slate-400 shrink-0" />}
+                {fs_.status === 'done'      && <CheckCircle2 size={13} className="text-green-500 shrink-0" />}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {finished && (
+          <p className="text-xs font-semibold text-green-700 bg-green-50 px-3 py-2 rounded-xl flex items-center gap-1.5">
+            <CheckCircle2 size={13} /> {doneCount} photo{doneCount !== 1 ? 's' : ''} published to gallery
+          </p>
+        )}
+
+        {files.length > 0 && !finished && (
+          <button
+            onClick={upload}
+            disabled={uploading || pendingCount === 0}
+            className="w-full py-3 rounded-2xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg,#0F172A,#334155)' }}
+          >
+            {uploading
+              ? <><Loader2 size={14} className="animate-spin" />{doneCount}/{files.length} uploaded…</>
+              : <><Upload size={14} />Upload {files.length} photo{files.length !== 1 ? 's' : ''}</>}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Photo grid card ─────────────────────────────────────── */
+function PhotoCard({ photo, onClick, onToggle, onDelete, isHidden, toggling, deleting }: {
+  photo: Photo;
+  onClick: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
+  isHidden: boolean;
+  toggling: boolean;
+  deleting: boolean;
+}) {
+  return (
+    <div className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 cursor-pointer">
+      <button className="absolute inset-0 w-full h-full" onClick={onClick}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={photo.thumbnail_url ?? photo.url}
+          alt={photo.caption ?? ''}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+        />
+      </button>
+
+      {/* Top-right actions (visible on hover) */}
+      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={e => { e.stopPropagation(); onToggle(); }}
+          disabled={toggling}
+          title={isHidden ? 'Make visible' : 'Hide photo'}
+          className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition disabled:opacity-50"
+        >
+          {toggling
+            ? <Loader2 size={13} className="animate-spin text-white" />
+            : isHidden ? <Eye size={13} className="text-white" /> : <EyeOff size={13} className="text-white" />}
+        </button>
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+          disabled={deleting}
+          title="Delete photo"
+          className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-red-500 transition disabled:opacity-50"
+        >
+          {deleting
+            ? <Loader2 size={13} className="animate-spin text-white" />
+            : <Trash2 size={13} className="text-white" />}
+        </button>
+      </div>
+
+      {/* Bottom gradient + uploader name (on hover) */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-2 px-2.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        <p className="text-white text-[11px] font-semibold truncate">{photo.uploader_name}</p>
+        {photo.caption && <p className="text-white/60 text-[10px] truncate">{photo.caption}</p>}
+      </div>
+
+      {/* Hidden badge */}
+      {isHidden && (
+        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
+          <EyeOff size={10} className="text-white/70" />
+          <span className="text-[10px] text-white/70 font-semibold">Hidden</span>
+        </div>
       )}
     </div>
   );
@@ -409,15 +565,16 @@ function AdminUploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => voi
 
 /* ── Main module ─────────────────────────────────────────── */
 export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]; useS3: boolean }) {
-  const [photos, setPhotos]           = useState<Photo[]>(initial);
-  const [tab, setTab]                 = useState<'visible' | 'hidden'>('visible');
-  const [confirmId, setConfirmId]     = useState<number | null>(null);
-  const [deleting, setDeleting]       = useState<number | null>(null);
-  const [toggling, setToggling]       = useState<number | null>(null);
-  const [lightbox, setLightbox]       = useState<{ list: Photo[]; idx: number } | null>(null);
+  const [photos, setPhotos]               = useState<Photo[]>(initial);
+  const [tab, setTab]                     = useState<'visible' | 'hidden'>('visible');
+  const [confirmId, setConfirmId]         = useState<number | null>(null);
+  const [deleting, setDeleting]           = useState<number | null>(null);
+  const [toggling, setToggling]           = useState<number | null>(null);
+  const [lightbox, setLightbox]           = useState<{ list: Photo[]; idx: number } | null>(null);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [deleteAllInput, setDeleteAllInput] = useState('');
-  const [deletingAll, setDeletingAll] = useState(false);
+  const [deletingAll, setDeletingAll]     = useState(false);
+  const [faceFilterIds, setFaceFilterIds] = useState<number[] | null>(null);
 
   async function refresh() {
     const d = await fetch('/api/photos?all=1').then(r => r.json());
@@ -457,20 +614,19 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
     await refresh();
   }
 
-  const visible  = photos.filter(p => p.approved !== -1);
-  const hidden   = photos.filter(p => p.approved === -1);
-  const tabList  = tab === 'visible' ? visible : hidden;
+  const visible = photos.filter(p => p.approved !== -1);
+  const hidden  = photos.filter(p => p.approved === -1);
+  const baseList = tab === 'visible' ? visible : hidden;
+  const tabList = faceFilterIds
+    ? baseList.filter(p => faceFilterIds.includes(p.id))
+    : baseList;
 
   return (
-    <div className="space-y-5">
+    <>
       {confirmId !== null && (
-        <ConfirmDialog
-          onConfirm={() => doDelete(confirmId)}
-          onCancel={() => setConfirmId(null)}
-        />
+        <ConfirmDialog onConfirm={() => doDelete(confirmId)} onCancel={() => setConfirmId(null)} />
       )}
 
-      {/* Delete-all confirmation modal */}
       {showDeleteAll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
@@ -481,7 +637,7 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
               <div>
                 <h3 className="font-extrabold text-slate-900">Delete All Photos?</h3>
                 <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                  This will permanently delete all {photos.length} photos from the gallery and storage. Face tags will also be cleared. This cannot be undone.
+                  Permanently deletes all {photos.length} photos and clears all face tags. Cannot be undone.
                 </p>
               </div>
             </div>
@@ -490,23 +646,19 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
                 Type <span className="font-black text-red-600">DELETE</span> to confirm
               </label>
               <input
-                type="text"
-                value={deleteAllInput}
+                type="text" value={deleteAllInput}
                 onChange={e => setDeleteAllInput(e.target.value)}
                 placeholder="DELETE"
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-300"
               />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => { setShowDeleteAll(false); setDeleteAllInput(''); }}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50"
-              >Cancel</button>
+              <button onClick={() => { setShowDeleteAll(false); setDeleteAllInput(''); }}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
               <button
                 onClick={doDeleteAll}
                 disabled={deleteAllInput !== 'DELETE' || deletingAll}
-                className="flex-1 py-2.5 rounded-xl text-sm font-extrabold text-white disabled:opacity-40 flex items-center justify-center gap-1.5"
-                style={{ background: '#DC2626' }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-extrabold text-white disabled:opacity-40 flex items-center justify-center gap-1.5 bg-red-600"
               >
                 {deletingAll ? <><Loader2 size={13} className="animate-spin" />Deleting…</> : <><Trash2 size={13} />Delete All</>}
               </button>
@@ -526,77 +678,120 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
         />
       )}
 
-      <AdminUploadPanel useS3={useS3} onDone={refresh} />
+      {/* ── 2-column layout ─────────────────────────────── */}
+      <div className="grid lg:grid-cols-[300px_1fr] gap-6 items-start">
 
-      <FaceMatchingPanel />
+        {/* ── Left sidebar ──────────────────────────────── */}
+        <div className="space-y-4">
+          <UploadPanel useS3={useS3} onDone={refresh} />
+          <ProcessingPanel />
 
-      {/* ── Tabs ── */}
-      <div className="flex gap-2 border-b border-slate-100 pb-0">
-        {(['visible', 'hidden'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-bold rounded-t-xl transition-colors ${tab === t ? 'bg-white border border-b-white border-slate-200 -mb-px text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>
-            {t === 'visible' ? `Visible (${visible.length})` : `Hidden (${hidden.length})`}
-          </button>
-        ))}
-      </div>
-
-      {tabList.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-          <span className="text-4xl mb-3">{tab === 'visible' ? '📷' : '🙈'}</span>
-          <p className="font-bold text-sm">{tab === 'visible' ? 'No photos yet' : 'No hidden photos'}</p>
-        </div>
-      )}
-
-      {tabList.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {tabList.map((p, i) => (
-            <div key={p.id} className="rounded-xl overflow-hidden border border-slate-200 bg-white relative">
-              <button className="w-full" onClick={() => setLightbox({ list: tabList, idx: i })}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.thumbnail_url ?? p.url} alt="" className="w-full h-32 object-cover" loading="lazy" />
+          {/* Danger zone */}
+          {photos.length > 0 && (
+            <div className="rounded-2xl border border-red-100 bg-red-50 p-4 space-y-2">
+              <p className="text-[11px] font-extrabold text-red-500 uppercase tracking-wider flex items-center gap-1.5">
+                <TriangleAlert size={11} /> Danger Zone
+              </p>
+              <p className="text-[11px] text-red-400 leading-relaxed">
+                Start fresh — removes all {photos.length} photos and clears face tags.
+              </p>
+              <button
+                onClick={() => setShowDeleteAll(true)}
+                className="w-full py-2 rounded-xl border border-red-200 text-red-600 text-xs font-extrabold hover:bg-red-100 transition flex items-center justify-center gap-1.5"
+              >
+                <Trash2 size={12} /> Delete All Photos
               </button>
-              <div className="p-2">
-                <p className="text-xs font-semibold text-slate-700 truncate">{p.uploader_name}</p>
-                {p.caption && <p className="text-xs text-slate-400 truncate">{p.caption}</p>}
-              </div>
-              <div className="flex border-t border-slate-100">
-                <button
-                  onClick={() => toggleVisibility(p.id, tab === 'visible')}
-                  disabled={toggling === p.id}
-                  className={`flex-1 py-2 text-xs font-extrabold transition flex items-center justify-center gap-1 disabled:opacity-40 ${tab === 'visible' ? 'text-slate-500 hover:bg-slate-50' : 'text-green-600 hover:bg-green-50'}`}
-                >
-                  {toggling === p.id
-                    ? <Loader2 size={12} className="animate-spin" />
-                    : tab === 'visible' ? 'Hide' : 'Make Visible'}
-                </button>
-                <button
-                  onClick={() => setConfirmId(p.id)}
-                  disabled={deleting === p.id}
-                  className="px-3 py-2 text-red-400 hover:bg-red-50 transition border-l border-slate-100 disabled:opacity-40"
-                >
-                  {deleting === p.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                </button>
-              </div>
             </div>
-          ))}
+          )}
         </div>
-      )}
 
-      {/* ── Danger Zone ── */}
-      {photos.length > 0 && (
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-4 space-y-2">
-          <p className="text-xs font-extrabold text-red-600 uppercase tracking-wider flex items-center gap-1.5">
-            <TriangleAlert size={12} /> Danger Zone
-          </p>
-          <p className="text-xs text-red-500">Start fresh — removes all {photos.length} photos from gallery and storage, and clears all face tags.</p>
-          <button
-            onClick={() => setShowDeleteAll(true)}
-            className="w-full py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-extrabold hover:bg-red-100 transition flex items-center justify-center gap-1.5"
-          >
-            <Trash2 size={13} /> Delete All Photos
-          </button>
+        {/* ── Right: AI search + gallery ────────────────── */}
+        <div className="space-y-4">
+          {/* AI Face Search (full width, above gallery) */}
+          <FaceFinder onResults={ids => { setFaceFilterIds(ids); if (ids) setTab('visible'); }} />
+
+          {/* Toolbar */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex rounded-xl border border-slate-200 bg-white overflow-hidden">
+              {(['visible', 'hidden'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => { setTab(t); setFaceFilterIds(null); }}
+                  className={`px-4 py-2 text-sm font-bold transition-colors ${
+                    tab === t ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  {t === 'visible' ? `Visible` : `Hidden`}
+                  <span className={`ml-1.5 text-[11px] font-black rounded-full px-1.5 py-0.5 ${
+                    tab === t ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {t === 'visible' ? visible.length : hidden.length}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Active face filter banner */}
+            {faceFilterIds && (
+              <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5">
+                <ScanFace size={13} className="text-indigo-600 shrink-0" />
+                <span className="text-xs font-bold text-indigo-700">
+                  AI filter: {tabList.length} match{tabList.length !== 1 ? 'es' : ''} in gallery
+                </span>
+                <button
+                  onClick={() => setFaceFilterIds(null)}
+                  className="ml-1 text-indigo-400 hover:text-indigo-700 transition"
+                  title="Clear filter"
+                >
+                  <FilterX size={13} />
+                </button>
+              </div>
+            )}
+
+            <p className="text-xs text-slate-400 ml-auto">Click photo to view · hover for actions</p>
+          </div>
+
+          {/* Empty state */}
+          {tabList.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-100">
+              {faceFilterIds ? (
+                <>
+                  <span className="text-5xl mb-4">🔍</span>
+                  <p className="font-bold text-slate-600">No gallery matches found</p>
+                  <p className="text-sm mt-1">Run "Tag All Photos" if this is unexpected, or the person may not appear in this gallery</p>
+                  <button onClick={() => setFaceFilterIds(null)} className="mt-4 text-sm font-semibold text-indigo-600 hover:underline flex items-center gap-1">
+                    <FilterX size={13} /> Clear filter
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-5xl mb-4">{tab === 'visible' ? '📷' : '🙈'}</span>
+                  <p className="font-bold text-slate-600">{tab === 'visible' ? 'No photos yet' : 'No hidden photos'}</p>
+                  <p className="text-sm mt-1">{tab === 'visible' ? 'Upload photos using the panel on the left' : 'Hidden photos appear here'}</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Google Photos-style grid */}
+          {tabList.length > 0 && (
+            <div className="grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-1.5">
+              {tabList.map((p, i) => (
+                <PhotoCard
+                  key={p.id}
+                  photo={p}
+                  isHidden={tab === 'hidden'}
+                  toggling={toggling === p.id}
+                  deleting={deleting === p.id}
+                  onClick={() => setLightbox({ list: tabList, idx: i })}
+                  onToggle={() => toggleVisibility(p.id, tab === 'visible')}
+                  onDelete={() => setConfirmId(p.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

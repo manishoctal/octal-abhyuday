@@ -142,6 +142,7 @@ db.exec(`
   INSERT OR IGNORE INTO settings (key, value) VALUES ('results_announced', '0');
   INSERT OR IGNORE INTO settings (key, value) VALUES ('event_name', 'ABHYUDAY 2026');
   INSERT OR IGNORE INTO settings (key, value) VALUES ('voting_round', '1');
+  INSERT OR IGNORE INTO settings (key, value) VALUES ('total_rounds', '2');
 `);
 
 // ---------- users ----------
@@ -170,7 +171,8 @@ export function getAppState(): AppState {
     voting_state: (map.voting_state ?? 'not_started') as VotingState,
     results_announced: map.results_announced === '1',
     event_name: map.event_name ?? 'ABHYUDAY 2026',
-    voting_round: (map.voting_round === '2' ? 2 : 1) as VotingRound,
+    voting_round: Math.max(1, parseInt(map.voting_round ?? '1', 10)),
+    total_rounds: Math.max(1, parseInt(map.total_rounds ?? '2', 10)),
   };
 }
 
@@ -338,13 +340,13 @@ export function getStats(round: VotingRound) {
   return { totalVotes, totalUsers, voters };
 }
 
-/** Close round 1: mark the chosen finalists and reset the state machine for round 2. */
-export function promoteFinalists(candidateIds: number[]) {
+/** Advance to the next round: mark the chosen candidates as finalists and bump the round counter. */
+export function promoteFinalists(candidateIds: number[], nextRound: number) {
   const run = db.transaction(() => {
     db.prepare('UPDATE candidates SET is_finalist = 0').run();
     const mark = db.prepare('UPDATE candidates SET is_finalist = 1 WHERE id = ?');
     for (const id of candidateIds) mark.run(id);
-    setSetting('voting_round', '2');
+    setSetting('voting_round', String(nextRound));
     setSetting('voting_state', 'not_started');
     setSetting('results_announced', '0');
   });
@@ -470,7 +472,13 @@ if (!eventInfoCols.includes('maps_url')) {
 }
 
 export function listEventInfo(): EventInfoItem[] {
-  return db.prepare('SELECT * FROM event_info ORDER BY section ASC, sort_order ASC').all() as EventInfoItem[];
+  return db.prepare('SELECT * FROM event_info ORDER BY sort_order ASC, id ASC').all() as EventInfoItem[];
+}
+
+export function reorderEventInfo(ids: number[]) {
+  const stmt = db.prepare('UPDATE event_info SET sort_order=? WHERE id=?');
+  const tx = db.transaction(() => ids.forEach((id, i) => stmt.run(i, id)));
+  tx();
 }
 
 export function upsertEventInfo(
@@ -586,21 +594,23 @@ export function listDepartments(): string[] {
   ).all() as { department: string }[]).map((r) => r.department);
 }
 
-/** Vote-based promotion: the admin chooses how many advance per gender.
+/** Vote-based promotion: admin chooses how many advance per gender from the current round.
  *  Ties at the cutoff are included (when the cutoff has actual votes). */
 export function promoteTopByVotes(
   maleCount: number,
-  femaleCount: number
+  femaleCount: number,
+  currentRound: number,
+  nextRound: number,
 ): { male: CandidateWithVotes[]; female: CandidateWithVotes[] } {
   const pick = (gender: Gender, n: number) => {
-    const ranked = listCandidates(gender, { round: 1 });
+    const ranked = listCandidates(gender, { round: currentRound, finalistsOnly: currentRound > 1 });
     if (ranked.length <= n) return ranked;
     const cutoff = ranked[n - 1].vote_count;
     return cutoff > 0 ? ranked.filter((c) => c.vote_count >= cutoff) : ranked.slice(0, n);
   };
   const male = pick('male', maleCount);
   const female = pick('female', femaleCount);
-  promoteFinalists([...male, ...female].map((c) => c.id));
+  promoteFinalists([...male, ...female].map((c) => c.id), nextRound);
   return { male, female };
 }
 
@@ -630,6 +640,10 @@ db.exec(`
     announced_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(category_id)
   );
+`);
+// Ensure the UNIQUE constraint index exists even for databases created before it was added
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_award_winners_category ON award_winners(category_id)`);
+db.exec(`
   CREATE TABLE IF NOT EXISTS photos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uploader_id INTEGER NOT NULL REFERENCES users(id),
@@ -729,9 +743,8 @@ export function deleteAwardNominee(id: number) {
   db.prepare('DELETE FROM award_nominees WHERE id=?').run(id);
 }
 export function announceWinner(categoryId: number, nomineeId: number) {
-  db.prepare(
-    'INSERT INTO award_winners (category_id, nominee_id) VALUES (?,?) ON CONFLICT(category_id) DO UPDATE SET nominee_id=excluded.nominee_id, announced_at=datetime("now")'
-  ).run(categoryId, nomineeId);
+  db.prepare('DELETE FROM award_winners WHERE category_id=?').run(categoryId);
+  db.prepare('INSERT INTO award_winners (category_id, nominee_id) VALUES (?,?)').run(categoryId, nomineeId);
 }
 export function clearWinner(categoryId: number) {
   db.prepare('DELETE FROM award_winners WHERE category_id=?').run(categoryId);

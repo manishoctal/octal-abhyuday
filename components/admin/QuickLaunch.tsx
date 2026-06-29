@@ -103,93 +103,73 @@ export default function QuickLaunch({ kind }: { kind: Extract<QaSessionKind, 'po
   }
 
   return (
-    <div className="space-y-5">
-      {/* Active banner */}
-      {active && (
-        <div className="bg-green-50 border border-green-300 rounded-2xl p-5">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-green-600 animate-pulse">
-                ● Live now
-              </p>
-              <p className="font-extrabold text-slate-900 truncate">{active.title}</p>
-            </div>
+    <div className="grid lg:grid-cols-[400px_1fr] gap-6 items-start">
+
+      {/* ── Left: launch form ───────────────────────── */}
+      <div className="space-y-4 lg:sticky lg:top-6">
+        {/* Active banner */}
+        {active && (
+          <div className="bg-green-50 border border-green-300 rounded-2xl p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-green-600 animate-pulse mb-1">● Live now</p>
+            <p className="font-extrabold text-slate-900 truncate mb-3">{active.title}</p>
             <div className="flex gap-2">
-              <a
-                href="/stage"
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-bold hover:bg-slate-700"
-              >
-                🖥️ Stage View
+              <a href="/stage" target="_blank" rel="noreferrer"
+                className="flex-1 text-center rounded-xl bg-slate-900 text-white px-3 py-2 text-sm font-bold hover:bg-slate-700">
+                🖥️ Stage
               </a>
-              <button
-                onClick={() => endActive(active)}
-                className="rounded-xl bg-red-600 text-white px-4 py-2.5 text-sm font-bold hover:bg-red-700"
-              >
-                🏁 End {m.noun}
+              <button onClick={() => endActive(active)}
+                className="flex-1 rounded-xl bg-red-600 text-white px-3 py-2 text-sm font-bold hover:bg-red-700">
+                🏁 End
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Launcher */}
-      <form onSubmit={launch} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
-        <h3 className="font-bold text-slate-900">
-          {m.emoji} Launch a {m.noun}
-        </h3>
-        <input
-          placeholder={kind === 'poll' ? 'Poll question, e.g. Where should the team outing be?' : 'What should everyone rank?'}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          required
-          maxLength={300}
-          className="w-full rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <textarea
-          placeholder={m.optionsHint}
-          value={optionsText}
-          onChange={(e) => setOptionsText(e.target.value)}
-          rows={4}
-          required
-          className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <p className="text-xs text-slate-500">
-          {kind === 'poll'
-            ? '📊 Voters see live results the moment they vote. Goes live on every phone instantly.'
-            : '🏅 Everyone taps the items in their order; the crowd ranking updates live. Goes live instantly.'}
-        </p>
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-xl bg-gradient-to-r from-brand-600 to-purple-600 text-white py-3 font-black text-base hover:opacity-95 disabled:opacity-50 active:scale-[0.99]"
-        >
-          {busy ? 'Launching…' : `🚀 Launch ${m.noun} live`}
-        </button>
-      </form>
+        <form onSubmit={launch} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+          <h3 className="font-bold text-slate-900">{m.emoji} Launch a {m.noun}</h3>
+          <input
+            placeholder={kind === 'poll' ? 'Poll question…' : 'What should everyone rank?'}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            required maxLength={300}
+            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+          />
+          <textarea
+            placeholder={m.optionsHint}
+            value={optionsText}
+            onChange={(e) => setOptionsText(e.target.value)}
+            rows={5} required
+            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+          <p className="text-xs text-slate-500">
+            {kind === 'poll' ? '📊 Results appear live as people vote.' : '🏅 Everyone ranks; crowd order forms live.'}
+          </p>
+          <button type="submit" disabled={busy}
+            className="w-full rounded-xl bg-gradient-to-r from-brand-600 to-purple-600 text-white py-3 font-black text-sm hover:opacity-95 disabled:opacity-50">
+            {busy ? 'Launching…' : `🚀 Launch ${m.noun} live`}
+          </button>
+        </form>
+      </div>
 
-      {/* History */}
+      {/* ── Right: history ──────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <h3 className="font-bold text-slate-900 mb-3">Previous {m.noun}s</h3>
         {mine.filter((s) => s.status !== 'live').length === 0 ? (
-          <p className="text-sm text-slate-400">None yet.</p>
+          <p className="text-sm text-slate-400 py-6 text-center">No previous {m.noun}s yet.</p>
         ) : (
           <div className="space-y-2">
-            {mine
-              .filter((s) => s.status !== 'live')
-              .map((s) => (
-                <div key={s.id} className="flex items-center gap-3 rounded-xl border border-slate-100 px-4 py-2.5">
-                  <p className="flex-1 min-w-0 font-semibold text-slate-800 truncate">{s.title}</p>
-                  <span className="shrink-0 text-[11px] font-bold uppercase text-slate-400">{s.status}</span>
-                  <button
-                    onClick={() => remove(s)}
-                    className="shrink-0 text-sm font-semibold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg"
-                  >
-                    Delete
-                  </button>
+            {mine.filter((s) => s.status !== 'live').map((s) => (
+              <div key={s.id} className="flex items-center gap-3 rounded-xl border border-slate-100 px-4 py-3 hover:bg-slate-50 transition">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-800 truncate text-sm">{s.title}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{s.question_count} options · {s.status}</p>
                 </div>
-              ))}
+                <button onClick={() => remove(s)}
+                  className="shrink-0 text-xs font-semibold text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">
+                  Delete
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -197,9 +177,7 @@ export default function QuickLaunch({ kind }: { kind: Extract<QaSessionKind, 'po
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-xl max-w-[90vw] text-center"
           >
             {toast}

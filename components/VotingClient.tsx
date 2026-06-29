@@ -41,9 +41,10 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
 
   const { state, myVotes } = data;
   const round = state.voting_round;
+  const isFinalRound = round === state.total_rounds;
 
   // Finale ended + announced → results experience
-  if (round === 2 && state.voting_state === 'ended' && state.results_announced) {
+  if (isFinalRound && state.voting_state === 'ended' && state.results_announced) {
     router.replace('/voting-results');
     return null;
   }
@@ -72,10 +73,14 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
       </h1>
       <span
         className={`inline-block mt-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${
-          round === 1 ? 'bg-brand-50 text-brand-700' : 'bg-amber-100 text-amber-700'
+          isFinalRound ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-700'
         }`}
       >
-        {round === 1 ? '🔎 Qualifier — vote 1 male & 1 female · top 10 advance' : '🏆 Grand Finale'}
+        {isFinalRound
+          ? '🏆 Grand Finale'
+          : round === 1
+            ? '🔎 Qualifier — vote 1 male & 1 female'
+            : `🔎 Round ${round} — vote 1 male & 1 female`}
       </span>
       {greeting && <p className="text-sm text-slate-500 mt-1.5">{greeting}</p>}
     </div>
@@ -88,11 +93,11 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
         {qaBanner}
         <StateHero
           emoji="⏳"
-          title={round === 1 ? "Qualifier voting hasn't started yet" : 'The Grand Finale is coming!'}
+          title={isFinalRound ? 'The Grand Finale is coming!' : round === 1 ? "Qualifier voting hasn't started yet" : `Round ${round} voting hasn't started yet`}
           subtitle={
-            round === 1
-              ? 'Hang tight! This page will come alive the moment the admin opens voting.'
-              : 'The finalists are locked in — voting opens at the event. This page will come alive automatically.'
+            isFinalRound
+              ? 'The finalists are locked in — voting opens at the event. This page will come alive automatically.'
+              : 'Hang tight! This page will come alive the moment the admin opens voting.'
           }
           pulse
         />
@@ -106,12 +111,12 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
         {eventHero}
         {qaBanner}
         <StateHero
-          emoji="✨"
-          title={round === 1 ? 'Qualifier closed — finalists coming soon' : 'Voting closed — results coming soon'}
+          emoji={isFinalRound ? '🏆' : '⏳'}
+          title={isFinalRound ? 'Results announcing soon!' : `Next round coming soon!`}
           subtitle={
-            round === 1
-              ? 'The top 10 men and women will advance to the Grand Finale on event day!'
-              : "The votes are in! This page will switch to the results the moment they're announced."
+            isFinalRound
+              ? "The votes are in! This page will switch to the results the moment they're announced."
+              : `Round ${round} is over. Hang tight — Round ${round + 1} will open shortly.`
           }
           pulse
         />
@@ -186,7 +191,7 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
         ))}
       </div>
 
-      {/* Confirm sheet (round 2 only) */}
+      {/* Confirm sheet */}
       <AnimatePresence>
         {confirming && (
           <motion.div
@@ -272,7 +277,7 @@ function CategorySection({
   emoji: string;
   label: string;
   gender: Gender;
-  round: 1 | 2;
+  round: number;
   candidates: CandidateWithVotes[];
   myVotes: number[];
   canVote: boolean;

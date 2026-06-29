@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { getAppState } from '@/lib/db';
 import SplashHider from '@/components/SplashHider';
+import EventAlertToast from '@/components/EventAlertToast';
 import './globals.css';
 
 export function generateMetadata(): Metadata {
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="splash-by">Octal IT Solutions</div>
         </div>
         <SplashHider />
+        <EventAlertToast />
         {children}
       </body>
     </html>

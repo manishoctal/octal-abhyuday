@@ -109,7 +109,12 @@ const SESSION_ICON: Record<string, React.ReactNode> = {
   ceremony: <Award size={16} strokeWidth={1.8} />,
 };
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  const m = iso.match(/T?(\d{1,2}):(\d{2})/);
+  if (!m) return iso;
+  const h = parseInt(m[1], 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${m[2]} ${ampm}`;
 }
 
 /* ── Today's Highlights (inside hero) ──────────────────── */

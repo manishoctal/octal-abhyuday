@@ -25,8 +25,12 @@ const TYPE_BG: Record<string, string> = {
 };
 
 function fmtTime(iso: string) {
-  try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
-  catch { return iso; }
+  const m = iso.match(/T?(\d{1,2}):(\d{2})/);
+  if (!m) return iso;
+  const h = parseInt(m[1], 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${m[2]} ${ampm}`;
 }
 function fmtDate(iso: string) {
   try { return new Date(iso).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); }

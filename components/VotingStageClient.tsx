@@ -155,7 +155,11 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
   });
   const { data: awardsData } = useSWR('/api/awards', fetcher, { refreshInterval: 8000 });
 
-  const votingState = data?.state.voting_state ?? 'not_started';
+  const votingState      = data?.state.voting_state      ?? 'not_started';
+  const resultsAnnounced = data?.state.results_announced ?? false;
+  const round            = data?.state.voting_round      ?? 1;
+  const totalRounds      = data?.state.total_rounds      ?? 2;
+  const isFinalRound     = round === totalRounds;
   const topMale   = data?.topMale   ?? [];
   const topFemale = data?.topFemale ?? [];
   const stats     = data?.stats;
@@ -165,21 +169,68 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
   const prevWinnerCount = useRef(0);
   const [winnerBurst, setWinnerBurst] = useState<{ name: string; category: string } | null>(null);
 
+  const COLORS = ['#FE9234', '#FFD700', '#FF6B6B', '#4ECDC4', '#A78BFA', '#FFFFFF'];
+
+  // Fire confetti when results are first announced
+  const prevResultsAnnounced = useRef(false);
+  useEffect(() => {
+    if (resultsAnnounced && !prevResultsAnnounced.current) {
+      confetti({ particleCount: 300, spread: 100, origin: { y: 0.5 }, colors: COLORS, zIndex: 200 });
+      setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 60,  origin: { x: 0,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 400);
+      setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 120, origin: { x: 1,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 800);
+    }
+    prevResultsAnnounced.current = resultsAnnounced;
+  }, [resultsAnnounced]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (winnerCount > prevWinnerCount.current && winnerCount > 0) {
       const latest = winners[winners.length - 1] as { name: string; winner: { name: string } };
       setWinnerBurst({ name: latest.winner.name, category: latest.name });
-      const COLORS = ['#FE9234', '#FFD700', '#FF6B6B', '#4ECDC4', '#A78BFA', '#FFFFFF'];
       confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 }, colors: COLORS, zIndex: 200 });
-      setTimeout(() => confetti({ particleCount: 120, spread: 60, angle: 60, origin: { x: 0, y: 0.7 }, colors: COLORS, zIndex: 200 }), 300);
+      setTimeout(() => confetti({ particleCount: 120, spread: 60, angle: 60,  origin: { x: 0, y: 0.7 }, colors: COLORS, zIndex: 200 }), 300);
       setTimeout(() => confetti({ particleCount: 120, spread: 60, angle: 120, origin: { x: 1, y: 0.7 }, colors: COLORS, zIndex: 200 }), 500);
       setTimeout(() => setWinnerBurst(null), 5000);
     }
     prevWinnerCount.current = winnerCount;
-  }, [winnerCount, winners]);
+  }, [winnerCount, winners]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 relative overflow-hidden text-white">
+      {/* Voting ended overlay */}
+      <AnimatePresence>
+        {votingState === 'ended' && !resultsAnnounced && !winnerBurst && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm"
+          >
+            <div className="text-center px-10">
+              <motion.div
+                animate={{ scale: [1, 1.08, 1] }}
+                transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
+                className="text-7xl mb-6"
+              >
+                {isFinalRound ? '🏆' : '⏳'}
+              </motion.div>
+              <h2 className="text-4xl sm:text-6xl font-black text-white leading-tight">
+                {isFinalRound ? 'Results Announcing Soon' : 'Next Round Coming Soon'}
+              </h2>
+              <p className="mt-4 text-lg sm:text-xl text-slate-400 font-semibold">
+                {isFinalRound
+                  ? 'The votes are in — winners will be revealed any moment! 🎉'
+                  : `Round ${round} is over. Stay tuned for Round ${round + 1}!`}
+              </p>
+              <div className="mt-8 flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Winner announcement overlay */}
       <AnimatePresence>
         {winnerBurst && (

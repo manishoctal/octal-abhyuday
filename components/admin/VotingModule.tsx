@@ -99,107 +99,116 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
   );
 
   const round = state.voting_round;
+  const totalRounds = state.total_rounds;
+  const isFinalRound = round === totalRounds;
+
+  const roundLabel = isFinalRound
+    ? `Round ${round} of ${totalRounds} · Grand Finale`
+    : round === 1
+      ? `Round 1 of ${totalRounds} · Qualifier`
+      : `Round ${round} of ${totalRounds} · Semi-Final`;
 
   return (
-    <div className="space-y-5">
-      <EventNameCard current={state.event_name} notify={notify} onSaved={() => mutate()} />
+    <div className="grid lg:grid-cols-[420px_1fr] gap-6 items-start">
 
-      {/* Current round + state */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              {round === 1 ? 'Round 1 · Qualifier' : 'Round 2 · Grand Finale'}
-            </p>
-            <p className="text-2xl font-black text-slate-900 mt-0.5">
-              {meta.emoji} {meta.label}
-            </p>
+      {/* ── Left: controls ───────────────────────────── */}
+      <div className="space-y-4 lg:sticky lg:top-6">
+        <EventNameCard current={state.event_name} notify={notify} onSaved={() => mutate()} />
+        <RoundsConfigCard current={totalRounds} currentRound={round} notify={notify} onSaved={() => mutate()} />
+
+        {/* Current round + state */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{roundLabel}</p>
+              <p className="text-2xl font-black text-slate-900 mt-0.5">{meta.emoji} {meta.label}</p>
+            </div>
+            <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${meta.color} ${vs === 'live' ? 'animate-pulse' : ''}`}>
+              {meta.label}
+            </span>
           </div>
-          <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${meta.color} ${vs === 'live' ? 'animate-pulse' : ''}`}>
-            {meta.label}
-          </span>
+          <p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
+            {isFinalRound
+              ? '🏆 Finalists only — live leaderboard visible to all.'
+              : round === 1
+                ? '🔎 Full pool — counts hidden. Pick who advances after voting ends.'
+                : `🔎 Promoted candidates only — choose who advances to Round ${round + 1}.`}
+          </p>
         </div>
-        <p className="mt-3 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
-          {round === 1
-            ? '🔎 Employees vote for 1 male & 1 female from the full pool — counts stay hidden from them. After ending Round 1 you review the ranked results and choose how many advance.'
-            : '🏆 Finalists only, one vote per category, live leaderboard visible to everyone. Finalists were promoted from the Round-1 votes.'}
-        </p>
-      </div>
 
-      {/* State machine buttons */}
-      <div className="grid grid-cols-2 gap-3">
-        {btn('▶️ Start Voting', 'start', vs === 'not_started', 'bg-green-600 text-white hover:bg-green-700')}
-        {vs === 'paused'
-          ? btn('▶️ Resume', 'resume', true, 'bg-green-600 text-white hover:bg-green-700')
-          : btn('⏸️ Pause', 'pause', vs === 'live', 'bg-amber-500 text-white hover:bg-amber-600')}
-        {btn(
-          '🏁 End Voting',
-          'end',
-          vs === 'live' || vs === 'paused',
-          'bg-red-600 text-white hover:bg-red-700',
-          round === 1
-            ? 'End Round 1? Voting closes and you can then review the results and promote the top finalists.'
-            : 'End voting? Employees will no longer be able to vote.'
-        )}
-        {btn('🔄 Reset All', 'reset', true, 'bg-slate-200 text-slate-700 hover:bg-slate-300', 'Reset voting state to "not started"? (Votes are kept; results flag is cleared.)')}
-      </div>
-
-      {/* Round-1 results: promote panel after R1 ends, read-only reference in R2 */}
-      {((round === 1 && vs === 'ended') || round === 2) && (
-        <Round1Results mode={round === 1 ? 'promote' : 'view'} notify={notify} onPromoted={() => mutate()} />
-      )}
-
-      {/* Announce (round 2 only) */}
-      {round === 2 && (
-        <>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() =>
-              doAction('announce', 'Announce results to ALL employees? This reveals the winners with full fanfare! 🎉')
-            }
-            disabled={vs !== 'ended' || state.results_announced || busy}
-            className="w-full rounded-2xl py-5 text-lg font-black text-white bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 shadow-xl shadow-pink-200 disabled:opacity-35 disabled:cursor-not-allowed"
-          >
-            {state.results_announced ? '🎉 Results Announced!' : '🎉 Announce Results'}
-          </motion.button>
-          {vs !== 'ended' && !state.results_announced && (
-            <p className="text-xs text-slate-400 text-center -mt-2">
-              End voting first to unlock the announcement
-            </p>
+        {/* State machine buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          {btn('▶️ Start', 'start', vs === 'not_started', 'bg-green-600 text-white hover:bg-green-700')}
+          {vs === 'paused'
+            ? btn('▶️ Resume', 'resume', true, 'bg-green-600 text-white hover:bg-green-700')
+            : btn('⏸️ Pause', 'pause', vs === 'live', 'bg-amber-500 text-white hover:bg-amber-600')}
+          {btn('🏁 End', 'end', vs === 'live' || vs === 'paused', 'bg-red-600 text-white hover:bg-red-700',
+            isFinalRound
+              ? 'End Grand Finale voting?'
+              : `End Round ${round} voting?`
           )}
-          <button
-            onClick={() =>
-              doAction('back_to_round1', 'Go back to Round 1? The qualifier reopens (paused) — ending it again re-runs the automatic top-10 promotion.')
-            }
-            disabled={busy}
-            className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100"
-          >
-            ↩ Back to Round 1 (qualifier)
-          </button>
-        </>
-      )}
+          {btn('🔄 Reset', 'reset', true, 'bg-slate-200 text-slate-700 hover:bg-slate-300',
+            'Reset voting to "not started"? (Votes are kept; results flag is cleared.)'
+          )}
+        </div>
 
-      {/* Live stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label={`R${round} votes`} value={stats.totalVotes} emoji="🗳️" />
-        <StatCard label="Voters" value={stats.voters} emoji="🙋" />
-        <StatCard label="Signed up" value={stats.totalUsers} emoji="👤" />
+        {/* Announce (final round only) */}
+        {isFinalRound && (
+          <div className="space-y-2">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => doAction('announce', 'Announce results to ALL employees? 🎉')}
+              disabled={vs !== 'ended' || state.results_announced || busy}
+              className="w-full rounded-2xl py-4 text-base font-black text-white bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 shadow-lg disabled:opacity-35 disabled:cursor-not-allowed"
+            >
+              {state.results_announced ? '🎉 Results Announced!' : '🎉 Announce Results'}
+            </motion.button>
+            {vs !== 'ended' && !state.results_announced && (
+              <p className="text-xs text-slate-400 text-center">End voting first</p>
+            )}
+            <button
+              onClick={() => doAction('back_to_round1', `Go back to Round 1? All ${totalRounds} rounds will need to re-run.`)}
+              disabled={busy}
+              className="w-full rounded-xl border border-slate-300 py-2 text-sm font-bold text-slate-500 hover:bg-slate-50"
+            >
+              ↩ Back to Round 1
+            </button>
+          </div>
+        )}
       </div>
 
-      <TopFive title={`🤵 Top 10 — Male (round ${round})`} list={data.topMale} />
-      <TopFive title={`👸 Top 10 — Female (round ${round})`} list={data.topFemale} />
+      {/* ── Right: live data ─────────────────────────── */}
+      <div className="space-y-5">
+        {/* Live stats */}
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard label={`Round ${round}${totalRounds > 1 ? ` of ${totalRounds}` : ''} votes`} value={stats.totalVotes} emoji="🗳️" />
+          <StatCard label="Voted so far" value={stats.voters} emoji="🙋" />
+        </div>
+
+        {/* Promote panel */}
+        {!isFinalRound && (vs === 'ended' || round > 1) && (
+          <RoundResults mode={vs === 'ended' ? 'promote' : 'view'} notify={notify} onPromoted={() => mutate()} />
+        )}
+        {isFinalRound && (
+          <RoundResults mode="view" notify={notify} onPromoted={() => mutate()} />
+        )}
+
+        <TopFive title={`🤵 Top 10 — Male (Round ${round})`} list={data.topMale} />
+        <TopFive title={`👸 Top 10 — Female (Round ${round})`} list={data.topFemale} />
+      </div>
     </div>
   );
 }
 
-/* ---------------- Round-1 results: ranked lists, CSV download, top-N promotion ---------------- */
+/* ---------------- Round results: ranked lists, CSV download, promotion ---------------- */
 
-interface Round1ResultsResponse {
+interface RoundResultsResponse {
   male: CandidateWithVotes[];
   female: CandidateWithVotes[];
+  state: AppState;
 }
 
-function Round1Results({
+function RoundResults({
   mode,
   notify,
   onPromoted,
@@ -208,17 +217,22 @@ function Round1Results({
   notify: (msg: string) => void;
   onPromoted: () => void;
 }) {
-  const { data } = useSWR<Round1ResultsResponse>('/api/admin/round1-results', fetcher);
+  const { data } = useSWR<RoundResultsResponse>('/api/admin/round1-results', fetcher);
   const [maleCount, setMaleCount] = useState(10);
   const [femaleCount, setFemaleCount] = useState(10);
   const [busy, setBusy] = useState(false);
 
   if (!data) return <Spinner />;
 
+  const { state } = data;
+  const round = state.voting_round;
+  const nextRound = round + 1;
+  const isFinalRound = round === state.total_rounds;
+
   async function promote() {
     if (
       !window.confirm(
-        `Promote the top ${maleCount} male + top ${femaleCount} female (by votes) to the Grand Finale? Ties at the cutoff are included.`
+        `Promote the top ${maleCount} male + top ${femaleCount} female to Round ${nextRound}${nextRound === state.total_rounds ? ' (Grand Finale)' : ''}? Ties at the cutoff are included.`
       )
     )
       return;
@@ -232,7 +246,7 @@ function Round1Results({
       const body = await res.json();
       notify(
         res.ok
-          ? `🏆 ${body.finalists.male.length} + ${body.finalists.female.length} finalists promoted — Round 2 is ready!`
+          ? `🏆 ${body.finalists.male.length} male + ${body.finalists.female.length} female promoted to Round ${body.nextRound}!`
           : (body.error ?? 'Promotion failed')
       );
       if (res.ok) onPromoted();
@@ -267,7 +281,11 @@ function Round1Results({
               />
               <span className="flex-1 min-w-0 text-sm font-semibold text-slate-800 truncate">
                 {c.name}
-                {advancing && <span className="ml-1.5 text-[10px] font-bold text-brand-600 uppercase">→ R2</span>}
+                {advancing && (
+                  <span className="ml-1.5 text-[10px] font-bold text-brand-600 uppercase">
+                    → R{nextRound}
+                  </span>
+                )}
               </span>
               <span className="shrink-0 text-xs font-bold text-brand-600">{c.vote_count}</span>
             </div>
@@ -277,11 +295,13 @@ function Round1Results({
     </div>
   );
 
+  const roundLabel = isFinalRound ? `Round ${round} (Grand Finale)` : `Round ${round}`;
+
   return (
     <div className={`bg-white rounded-2xl p-5 ${mode === 'promote' ? 'border-2 border-brand-200' : 'border border-slate-200'}`}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-extrabold text-slate-900">
-          📋 Round 1 results {mode === 'view' && <span className="text-slate-400 font-semibold">(qualifier)</span>}
+          📋 {roundLabel} results {mode === 'view' && !isFinalRound && <span className="text-slate-400 font-semibold">(reference)</span>}
         </h3>
         <a
           href="/api/admin/round1-results?format=csv"
@@ -293,20 +313,22 @@ function Round1Results({
       </div>
       <p className="text-xs text-slate-500 mt-1 mb-4">
         {mode === 'promote'
-          ? 'Ranked by votes. Choose how many advance per category — highlighted rows go to the Grand Finale (ties at the cutoff are included).'
-          : 'Final qualifier standings — highlighted rows were promoted to the finale.'}
+          ? `Ranked by votes. Choose how many advance to Round ${nextRound}${nextRound === state.total_rounds ? ' (Grand Finale)' : ''} — highlighted rows advance (ties at the cutoff are included).`
+          : isFinalRound
+            ? 'Final standings for this round.'
+            : `Standings — highlighted rows were promoted to Round ${nextRound}.`}
       </p>
 
-      {mode === 'promote' && (
+      {mode === 'promote' && !isFinalRound && (
         <div className="flex items-end gap-3 flex-wrap mb-4">
           <label className="text-sm font-semibold text-slate-600">
             Top male
             <input
               type="number"
               min={1}
-              max={50}
+              max={200}
               value={maleCount}
-              onChange={(e) => setMaleCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+              onChange={(e) => setMaleCount(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
               className="block mt-1 w-24 rounded-xl border border-slate-300 px-3 py-2 font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </label>
@@ -315,9 +337,9 @@ function Round1Results({
             <input
               type="number"
               min={1}
-              max={50}
+              max={200}
               value={femaleCount}
-              onChange={(e) => setFemaleCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+              onChange={(e) => setFemaleCount(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
               className="block mt-1 w-24 rounded-xl border border-slate-300 px-3 py-2 font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </label>
@@ -326,7 +348,9 @@ function Round1Results({
             disabled={busy}
             className="flex-1 min-w-[200px] rounded-xl py-3 px-4 font-black text-white bg-gradient-to-r from-brand-600 to-purple-600 hover:opacity-95 disabled:opacity-40"
           >
-            {busy ? 'Promoting…' : `🚀 Promote top ${maleCount} + ${femaleCount} to Round 2`}
+            {busy
+              ? 'Promoting…'
+              : `🚀 Promote top ${maleCount} + ${femaleCount} to Round ${nextRound}${nextRound === state.total_rounds ? ' (Finale)' : ''}`}
           </button>
         </div>
       )}
@@ -336,6 +360,78 @@ function Round1Results({
         {column('👸 Female', data.female, femaleCount)}
       </div>
     </div>
+  );
+}
+
+function RoundsConfigCard({
+  current,
+  currentRound,
+  notify,
+  onSaved,
+}: {
+  current: number;
+  currentRound: number;
+  notify: (msg: string) => void;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState(current);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setValue(current); }, [current]);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ totalRounds: value }),
+      });
+      const body = await res.json();
+      notify(res.ok ? `Total rounds set to ${value} ✅` : (body.error ?? 'Save failed'));
+      if (res.ok) onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="bg-white rounded-2xl border border-slate-200 p-5">
+      <label className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        Total rounds <span className="normal-case font-semibold">(1 = single round finale, 2 = qualifier + finale, etc.)</span>
+      </label>
+      <div className="flex gap-3 mt-2 items-center">
+        <div className="flex items-center gap-2">
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              type="button"
+              disabled={n < currentRound}
+              onClick={() => setValue(n)}
+              className={`w-10 h-10 rounded-xl font-black text-sm transition disabled:opacity-30 disabled:cursor-not-allowed ${
+                value === n
+                  ? 'bg-brand-600 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <button
+          type="submit"
+          disabled={saving || value === current}
+          className="ml-auto rounded-xl bg-brand-600 px-5 py-2.5 font-bold text-white hover:bg-brand-700 disabled:opacity-40"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-slate-400">
+        Currently in round {currentRound} — cannot set total below the current round.
+        {value > 1 && ` Round ${value} will be the Grand Finale.`}
+      </p>
+    </form>
   );
 }
 

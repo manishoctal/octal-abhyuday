@@ -23,8 +23,8 @@ export async function POST(req: Request) {
   if (!candidate || !candidate.gender) {
     return NextResponse.json({ error: 'Candidate not found' }, { status: 404 });
   }
-  if (state.voting_round === 2 && !candidate.is_finalist) {
-    return NextResponse.json({ error: 'This candidate is not in the finale' }, { status: 409 });
+  if (state.voting_round > 1 && !candidate.is_finalist) {
+    return NextResponse.json({ error: 'This candidate did not advance to this round' }, { status: 409 });
   }
 
   // Both rounds: one changeable vote per gender

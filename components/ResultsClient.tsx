@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { useRealtime } from './useRealtime';
 import type { CandidateWithVotes, AppState } from '@/lib/types';
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   const body = await res.json();
-  if (!res.ok) throw Object.assign(new Error(body.error ?? 'Error'), { status: res.status });
+  if (!res.ok) throw Object.assign(new Error(body.error ?? 'Error'), { status: res.status, body });
   return body;
 };
 
@@ -50,12 +51,13 @@ const SPARKLES = [
 ];
 
 export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
+  const router = useRouter();
   // SSE pushes the announcement instantly; polling is only a reconnect fallback
   useRealtime(['/api/results']);
   const { data, error } = useSWR<ResultsResponse>('/api/results', fetcher, {
-    refreshInterval: 15000,
+    refreshInterval: 10000,
     shouldRetryOnError: true,
-    errorRetryInterval: 5000,
+    errorRetryInterval: 3000,
   });
   const [phase, setPhase] = useState<'drumroll' | 'reveal'>('drumroll');
 
@@ -76,6 +78,13 @@ export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
   }, [data]);
 
   if (error && (error as { status?: number }).status === 403) {
+    const votingState = (error as { body?: { voting_state?: string } }).body?.voting_state;
+    // If voting is no longer ended (admin reset / new round started), go back to dashboard
+    if (votingState && votingState !== 'ended') {
+      router.replace('/');
+      return null;
+    }
+    // Voting ended but results not yet announced — wait for announcement
     return (
       <Stage>
         <div className="text-center py-24 relative z-10">

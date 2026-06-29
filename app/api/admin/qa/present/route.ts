@@ -22,7 +22,8 @@ export async function POST(req: Request) {
         const s = typeof sessionId === 'number' ? getQaSession(sessionId) : undefined;
         if (!s) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
         startSession(s.id);
-        break;
+        broadcast('qa', { kind: 'qa_live', title: '💬 Live Q&A Started!', body: 'Submit your questions now.' });
+        return NextResponse.json({ ok: true });
       }
       case 'end_session': {
         const s = typeof sessionId === 'number' ? getQaSession(sessionId) : undefined;

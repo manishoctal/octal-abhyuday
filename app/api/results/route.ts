@@ -10,12 +10,16 @@ export async function GET() {
 
   const state = getAppState();
   if (!state.results_announced && !session.isAdmin) {
-    return NextResponse.json({ error: 'Results not announced yet' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Results not announced yet', voting_state: state.voting_state },
+      { status: 403 }
+    );
   }
 
+  const finalRound = state.total_rounds;
   return NextResponse.json({
-    male: listCandidates('male', { round: 2, finalistsOnly: true }),
-    female: listCandidates('female', { round: 2, finalistsOnly: true }),
+    male:   listCandidates('male',   { round: finalRound, finalistsOnly: finalRound > 1 }),
+    female: listCandidates('female', { round: finalRound, finalistsOnly: finalRound > 1 }),
     state,
   });
 }

@@ -18,14 +18,14 @@ export async function GET(req: Request) {
   const state = getAppState();
   const round = state.voting_round;
 
+  const isFinalRound = round === state.total_rounds;
   let candidates = listCandidates(gender, {
     round,
-    finalistsOnly: round === 2,
-    // Qualifier: neutral alphabetical order, no standings
+    finalistsOnly: round > 1,
     orderByName: round === 1,
   });
-  if (round === 1) {
-    // Counts are admin-only during the qualifier
+  if (!isFinalRound) {
+    // Hide counts from voters until the Grand Finale
     candidates = candidates.map((c) => ({ ...c, vote_count: 0 }));
   }
 
