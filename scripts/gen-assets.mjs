@@ -22,9 +22,10 @@ const PUB  = `${ROOT}/public`;
  *  - inner cutout:   M50,22 L82,88 L18,88 Z  (makes it hollow = real A)
  *  - crossbar:        rect from x=32 y=64 w=36 h=10
  */
+// evenOdd fill rule: outer triangle is filled, inner triangle creates a transparent hole.
+// This ensures the hollow A looks correct on ANY background — not just the navy one.
 const A_PATH = `
-  <path d="M50,8 L92,92 L8,92 Z" fill="#FF7A00"/>
-  <path d="M50,26 L80,88 L20,88 Z" fill="#0F1035"/>
+  <path fill-rule="evenodd" d="M50,8 L92,92 L8,92 Z M50,26 L20,88 L80,88 Z" fill="#FF7A00"/>
   <rect x="32" y="62" width="36" height="11" fill="#FF7A00"/>
 `;
 
@@ -100,12 +101,14 @@ const ICON_SIZES = [
   { dir:'mipmap-xxhdpi',  size:144 },
   { dir:'mipmap-xxxhdpi', size:192 },
 ];
+// Adaptive icon foreground must be sized at the 108dp canvas equivalent per density.
+// (Standard launcher icon = 48dp; adaptive foreground canvas = 108dp = 2.25× larger.)
 const FG_SIZES = [
-  { dir:'mipmap-mdpi',       size:48  },
-  { dir:'mipmap-hdpi',       size:72  },
-  { dir:'mipmap-xhdpi',      size:96  },
-  { dir:'mipmap-xxhdpi',     size:144 },
-  { dir:'mipmap-xxxhdpi',    size:192 },
+  { dir:'mipmap-mdpi',       size:108 },
+  { dir:'mipmap-hdpi',       size:162 },
+  { dir:'mipmap-xhdpi',      size:216 },
+  { dir:'mipmap-xxhdpi',     size:324 },
+  { dir:'mipmap-xxxhdpi',    size:432 },
   { dir:'mipmap-anydpi-v26', size:108 },
 ];
 const SPLASH_SIZES = [
