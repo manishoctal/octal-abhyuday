@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 interface Release {
   downloadUrl:    string;
@@ -11,15 +11,59 @@ interface Release {
 }
 
 export default function AppReleaseModule({ initial }: { readonly initial: Release }) {
-  const [form, setForm]     = useState<Release>(initial);
-  const [saving, setSaving] = useState(false);
-  const [saved,  setSaved]  = useState(false);
-  const [err,    setErr]    = useState('');
+  const [form, setForm]         = useState<Release>(initial);
+  const [saving, setSaving]     = useState(false);
+  const [saved,  setSaved]      = useState(false);
+  const [err,    setErr]        = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadedName, setUploadedName] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const set =
     (k: keyof Release) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
+
+  async function handleApkFile(file: File) {
+    setErr(''); setUploading(true); setUploadPct(0);
+    try {
+      // 1. Get presigned upload URL
+      const presignRes = await fetch('/api/admin/apk-presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name }),
+      });
+      if (!presignRes.ok) {
+        const { error } = (await presignRes.json()) as { error?: string };
+        throw new Error(error ?? 'Could not get upload URL');
+      }
+      const { presignedUrl, publicUrl } = (await presignRes.json()) as {
+        presignedUrl: string;
+        publicUrl: string;
+      };
+
+      // 2. Upload directly to S3 using XHR so we get progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', presignedUrl);
+        xhr.setRequestHeader('Content-Type', 'application/vnd.android.package-archive');
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload  = () => (xhr.status === 200 ? resolve() : reject(new Error(`S3 error ${xhr.status}`)));
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.send(file);
+      });
+
+      setForm(f => ({ ...f, downloadUrl: publicUrl }));
+      setUploadedName(file.name);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function save() {
     setSaving(true); setErr(''); setSaved(false);
@@ -39,7 +83,7 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
   }
 
   const installUrl =
-    typeof globalThis.window !== 'undefined'
+    globalThis.window?.location.origin
       ? `${globalThis.window.location.origin}/install`
       : '/install';
 
@@ -49,20 +93,66 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
       <div className="card px-5 py-5 space-y-4">
         <h2 className="font-black text-slate-900 text-lg">Android App Release</h2>
 
-        <label className="block space-y-1.5">
+        {/* ── APK Upload ── */}
+        <div className="space-y-1.5">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-            APK Download URL
+            APK File
           </span>
+
+          {/* Hidden file input */}
           <input
-            value={form.downloadUrl}
-            onChange={set('downloadUrl')}
-            placeholder="https://…"
-            className="input w-full"
+            ref={fileRef}
+            type="file"
+            accept=".apk,application/vnd.android.package-archive"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleApkFile(file);
+              e.target.value = '';
+            }}
           />
-          <p className="text-xs text-slate-400">
-            Direct link to the APK (Google Drive share, Firebase App Distribution, S3 pre-signed URL, etc.)
-          </p>
-        </label>
+
+          {/* Upload button */}
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-slate-300 hover:border-orange-400 hover:bg-orange-50 transition-colors text-sm font-semibold text-slate-600 hover:text-orange-600 disabled:opacity-50"
+          >
+            {uploading ? `Uploading… ${uploadPct}%` : '⬆ Upload APK'}
+          </button>
+
+          {/* Progress bar */}
+          {uploading && (
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-orange-400 rounded-full transition-all duration-200"
+                style={{ width: `${uploadPct}%` }}
+              />
+            </div>
+          )}
+
+          {/* Current URL (read-only after upload, or existing saved URL) */}
+          {form.downloadUrl && (
+            <div className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+              <span className="text-green-600 text-sm mt-0.5">✓</span>
+              <div className="flex-1 min-w-0">
+                {uploadedName && (
+                  <p className="text-xs font-semibold text-slate-700 truncate">{uploadedName}</p>
+                )}
+                <p className="text-xs text-slate-400 truncate">{form.downloadUrl}</p>
+              </div>
+              <a
+                href={form.downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-orange-500 hover:underline shrink-0"
+              >
+                Test ↗
+              </a>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block space-y-1.5">
