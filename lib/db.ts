@@ -790,6 +790,19 @@ export function getPhotosByEmployeeId(employeeId: number): Photo[] {
   ).all(employeeId) as Photo[];
 }
 
+export function getPhotosWithConfidenceByEmployeeId(
+  employeeId: number,
+  minConfidence = 0,
+): Array<Photo & { tag_confidence: number }> {
+  return db.prepare(
+    `SELECT p.*, pt.confidence as tag_confidence
+     FROM photos p
+     JOIN photo_tags pt ON pt.photo_id = p.id
+     WHERE pt.employee_id = ? AND pt.confidence >= ? AND p.approved = 1
+     ORDER BY pt.confidence DESC`,
+  ).all(employeeId, minConfidence) as Array<Photo & { tag_confidence: number }>;
+}
+
 export function getTagsForPhoto(photoId: number) {
   return db.prepare(
     `SELECT pt.employee_id, pt.confidence, e.name, e.employee_code

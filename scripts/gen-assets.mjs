@@ -101,15 +101,16 @@ const ICON_SIZES = [
   { dir:'mipmap-xxhdpi',  size:144 },
   { dir:'mipmap-xxxhdpi', size:192 },
 ];
-// Adaptive icon foreground must be sized at the 108dp canvas equivalent per density.
-// (Standard launcher icon = 48dp; adaptive foreground canvas = 108dp = 2.25× larger.)
+// Adaptive icon foreground — sized at the 108dp canvas equivalent per density.
+// mipmap-anydpi-v26 must NOT contain a PNG (anydpi beats density qualifiers, so a
+// 108 px PNG there would override all density-specific files on every API 26+ device).
+// The adaptive icon XMLs reference @drawable/ic_launcher_foreground (vector) instead.
 const FG_SIZES = [
-  { dir:'mipmap-mdpi',       size:108 },
-  { dir:'mipmap-hdpi',       size:162 },
-  { dir:'mipmap-xhdpi',      size:216 },
-  { dir:'mipmap-xxhdpi',     size:324 },
-  { dir:'mipmap-xxxhdpi',    size:432 },
-  { dir:'mipmap-anydpi-v26', size:108 },
+  { dir:'mipmap-mdpi',    size:108 },
+  { dir:'mipmap-hdpi',    size:162 },
+  { dir:'mipmap-xhdpi',  size:216 },
+  { dir:'mipmap-xxhdpi', size:324 },
+  { dir:'mipmap-xxxhdpi',size:432 },
 ];
 const SPLASH_SIZES = [
   { dir:'drawable',              w:480,  h:800  },
@@ -138,12 +139,13 @@ async function run() {
   }
   console.log(`✓ SVG sanity check passed — ${testBuf.length} bytes for 192×192`);
 
-  /* Launcher icons */
+  /* Launcher icons — flatten to RGB (no alpha) so PackageInstaller renders correctly */
   for (const { dir, size } of ICON_SIZES) {
     const dest = join(RES, dir);
     mkdirSync(dest, { recursive: true });
-    await sharp(iconBuf).resize(size, size).png().toFile(join(dest, 'ic_launcher.png'));
-    await sharp(iconBuf).resize(size, size).png().toFile(join(dest, 'ic_launcher_round.png'));
+    const base = sharp(iconBuf).resize(size, size).flatten({ background: '#0F1035' });
+    await base.clone().png().toFile(join(dest, 'ic_launcher.png'));
+    await base.clone().png().toFile(join(dest, 'ic_launcher_round.png'));
     console.log(`✓ ${dir}/ic_launcher*.png  ${size}px`);
   }
 

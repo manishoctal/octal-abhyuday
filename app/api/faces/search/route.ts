@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getAllFaceEmbeddings, getPhotosByEmployeeId, listEmployees } from '@/lib/db';
+import { getAllFaceEmbeddings, getPhotosWithConfidenceByEmployeeId, listEmployees } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 const FACE_SERVICE = process.env.FACE_SERVICE_URL ?? 'http://localhost:8001';
-const THRESHOLD = 0.28;
+
+// buffalo_l (ArcFace) similarity guide:
+//   > 0.28 = likely same person
+//   > 0.40 = strong match
+//   0.05–0.18 = different people
+// EMPLOYEE_THRESHOLD: min cosine similarity to identify someone as a matching employee.
+// PHOTO_MIN_CONFIDENCE: min tag confidence a gallery photo must have been tagged at.
+//   Filters out "best-of-noise" tags where no one in the photo really looked like the employee.
+// COMBINED_FLOOR: geometric mean of (employee_sim × photo_confidence) must exceed this.
+//   Cuts photos that weakly pass both filters but aren't actually a good match overall.
+const EMPLOYEE_THRESHOLD  = 0.28;
+const PHOTO_MIN_CONFIDENCE = 0.30;
+const COMBINED_FLOOR       = 0.32;
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -46,7 +58,6 @@ export async function POST(req: Request) {
   } catch { /* ignore */ }
 
   if (!embedRes) {
-    // Fall back to single-face embed
     const uploadForm2 = new FormData();
     uploadForm2.append('file', photo);
     try {
@@ -68,15 +79,21 @@ export async function POST(req: Request) {
     }, { status: 422 });
   }
 
-  // Find the best matching employee for each detected face
+  // Find matching employees for each detected face
   const employees = listEmployees();
   const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
 
-  const allMatches: Array<{ employee_id: number; name: string; employee_code: string; profile_photo_url: string | null; similarity: number }> = [];
+  const allMatches: Array<{
+    employee_id: number;
+    name: string;
+    employee_code: string;
+    profile_photo_url: string | null;
+    similarity: number;
+  }> = [];
   const seenEmployees = new Set<number>();
 
   for (const faceVec of embedRes.embeddings) {
-    const matches = cosineSimilaritySearch(faceVec, allEmbeddings, THRESHOLD);
+    const matches = cosineSimilaritySearch(faceVec, allEmbeddings, EMPLOYEE_THRESHOLD);
     for (const m of matches) {
       if (!seenEmployees.has(m.employee_id)) {
         seenEmployees.add(m.employee_id);
@@ -96,11 +113,38 @@ export async function POST(req: Request) {
 
   allMatches.sort((a, b) => b.similarity - a.similarity);
 
-  // Collect photos for all matched employees
+  // Collect gallery photos, filtering by tag confidence and computing a combined score.
+  // combined_score = geometric mean of (employee_similarity × photo_tag_confidence).
+  // This penalises cases where either signal is weak — photos only surface when BOTH
+  // the uploaded face strongly matches the employee AND the gallery photo was confidently
+  // tagged to that employee during the indexing step.
   const seenPhotoIds = new Set<number>();
-  const photos = allMatches
-    .flatMap(m => getPhotosByEmployeeId(m.employee_id).map(p => ({ ...p, matched_employee_id: m.employee_id })))
-    .filter(p => { if (seenPhotoIds.has(p.id)) return false; seenPhotoIds.add(p.id); return true; });
+  const photos: Array<{
+    id: number; url: string; thumbnail_url: string | null; caption: string | null;
+    uploader_name: string; tag_confidence: number; match_score: number; matched_employee_id: number;
+  }> = [];
+
+  for (const m of allMatches) {
+    const empPhotos = getPhotosWithConfidenceByEmployeeId(m.employee_id, PHOTO_MIN_CONFIDENCE);
+    for (const p of empPhotos) {
+      if (seenPhotoIds.has(p.id)) continue;
+      const combined = Math.sqrt(m.similarity * p.tag_confidence);
+      if (combined < COMBINED_FLOOR) continue;
+      seenPhotoIds.add(p.id);
+      photos.push({
+        id: p.id,
+        url: p.url,
+        thumbnail_url: p.thumbnail_url,
+        caption: p.caption,
+        uploader_name: p.uploader_name,
+        tag_confidence: p.tag_confidence,
+        match_score: Math.round(combined * 10000) / 10000,
+        matched_employee_id: m.employee_id,
+      });
+    }
+  }
+
+  photos.sort((a, b) => b.match_score - a.match_score);
 
   return NextResponse.json({
     ok: true,

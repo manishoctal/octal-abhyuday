@@ -21,6 +21,8 @@ interface Photo {
   thumbnail_url: string | null;
   caption: string | null;
   uploader_name: string;
+  match_score?: number;
+  tag_confidence?: number;
 }
 
 interface SearchResult {
@@ -413,32 +415,38 @@ export default function FaceFinder({ onResults }: { onResults?: (photoIds: numbe
                     Matching Photos — click to enlarge
                   </p>
                   <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-1.5">
-                    {result.photos.map((p, i) => (
-                      <motion.button
-                        key={p.id}
-                        initial={{ opacity: 0, scale: 0.85 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: i * 0.03, type: 'spring', stiffness: 300 }}
-                        onClick={() => setLightbox(i)}
-                        className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={p.thumbnail_url ?? p.url}
-                          alt=""
-                          loading="lazy"
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        />
-                        {/* AI verified badge */}
-                        <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <CheckCircle2 size={11} className="text-white" />
-                        </div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <p className="absolute bottom-1 left-1 right-1 text-white text-[10px] font-semibold truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                          {p.uploader_name}
-                        </p>
-                      </motion.button>
-                    ))}
+                    {result.photos.map((p, i) => {
+                      const pct = p.match_score != null ? Math.round(p.match_score * 100) : null;
+                      const badgeColor = pct == null ? '' : pct >= 50 ? 'bg-green-500' : pct >= 38 ? 'bg-amber-500' : 'bg-orange-500';
+                      return (
+                        <motion.button
+                          key={p.id}
+                          initial={{ opacity: 0, scale: 0.85 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.03, type: 'spring', stiffness: 300 }}
+                          onClick={() => setLightbox(i)}
+                          className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.thumbnail_url ?? p.url}
+                            alt=""
+                            loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                          {/* Match score badge — always visible */}
+                          {pct != null && (
+                            <div className={`absolute top-1.5 left-1.5 ${badgeColor} text-white text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none`}>
+                              {pct}%
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <p className="absolute bottom-1 left-1 right-1 text-white text-[10px] font-semibold truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                            {p.uploader_name}
+                          </p>
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
