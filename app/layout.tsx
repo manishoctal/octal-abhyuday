@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { getAppState } from '@/lib/db';
 import SplashHider from '@/components/SplashHider';
 import EventAlertToast from '@/components/EventAlertToast';
+import AppUpdateCheck from '@/components/AppUpdateCheck';
 import './globals.css';
 
 export function generateMetadata(): Metadata {
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
         <SplashHider />
         <EventAlertToast />
+        <AppUpdateCheck />
         {children}
       </body>
     </html>

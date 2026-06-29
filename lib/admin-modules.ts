@@ -119,4 +119,12 @@ export const adminModules: AdminModule[] = [
     href: '/admin/leaderboard',
     status: 'live',
   },
+  {
+    id: 'app-release',
+    name: 'App Release',
+    emoji: '📦',
+    description: 'Manage the Android APK download link, version info, and force-update minimum version for attendees',
+    href: '/admin/app-release',
+    status: 'live',
+  },
 ];
