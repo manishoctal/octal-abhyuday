@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
-import { getVenueConfig, setVenueConfig } from '@/lib/db';
+import { getVenueConfig, setVenueConfig, getCheckinToken, regenerateCheckinToken } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const adminOrErr = await requireAdmin();
   if (isErrorResponse(adminOrErr)) return adminOrErr;
-  return NextResponse.json(getVenueConfig());
+  return NextResponse.json({ ...getVenueConfig(), checkin_token: getCheckinToken() });
+}
+
+export async function PATCH(req: Request) {
+  const adminOrErr = await requireAdmin();
+  if (isErrorResponse(adminOrErr)) return adminOrErr;
+  const { action } = await req.json().catch(() => ({})) as { action?: string };
+  if (action !== 'regenerate_token') return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  const token = regenerateCheckinToken();
+  return NextResponse.json({ ok: true, checkin_token: token });
 }
 
 export async function POST(req: Request) {

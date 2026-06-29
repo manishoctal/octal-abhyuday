@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { MapPin, CheckCircle2, Loader2, AlertTriangle, Navigation } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { MapPin, CheckCircle2, Loader2, AlertTriangle, Navigation, ScanLine, X } from 'lucide-react';
 
 interface Props {
   userId: number;
@@ -14,10 +14,64 @@ interface Props {
 
 type CheckInState = 'idle' | 'locating' | 'submitting' | 'success' | 'already' | 'error';
 
-export default function MyQrClient({ name, email, department, isCheckedIn: initial, eventName }: Props) {
+export default function MyQrClient({ userId, name, email, department, isCheckedIn: initial, eventName }: Props) {
   const [state, setState]       = useState<CheckInState>(initial ? 'already' : 'idle');
   const [distanceM, setDist]    = useState<number | null>(null);
   const [errorMsg, setError]    = useState('');
+  // Venue QR scanner state
+  interface IScanControls { stop(): void }
+  const [scanOpen,    setScanOpen]    = useState(false);
+  const [scanStatus,  setScanStatus]  = useState<'idle'|'scanning'|'verifying'|'error'>('idle');
+  const [scanErr,     setScanErr]     = useState('');
+  const videoRef2     = useRef<HTMLVideoElement>(null);
+  const controlsRef2  = useRef<IScanControls | null>(null);
+  const scanningRef2  = useRef(false);
+
+  const stopScan = useCallback(() => {
+    controlsRef2.current?.stop();
+    controlsRef2.current = null;
+    scanningRef2.current = false;
+    setScanStatus('idle');
+    setScanOpen(false);
+  }, []);
+
+  useEffect(() => () => { controlsRef2.current?.stop(); }, []);
+
+  async function openScanner() {
+    setScanErr(''); setScanStatus('scanning'); setScanOpen(true);
+    // Wait a tick for the video element to mount
+    await new Promise(r => setTimeout(r, 100));
+    const { BrowserQRCodeReader } = await import('@zxing/browser');
+    const reader = new BrowserQRCodeReader();
+    try {
+      const controls = await reader.decodeFromVideoDevice(undefined, videoRef2.current!, async (res) => {
+        if (!res || scanningRef2.current) return;
+        const text = res.getText();
+        let payload: { t?: string; tok?: string } = {};
+        try { payload = JSON.parse(text); } catch { return; }
+        if (payload.t !== 'venue_ci' || !payload.tok) return; // not a venue QR — ignore
+
+        scanningRef2.current = true;
+        setScanStatus('verifying');
+        try {
+          const r = await fetch('/api/attendance/qr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: payload.tok }),
+          });
+          const d = await r.json();
+          if (!r.ok) { setScanErr(d.error ?? 'Check-in failed'); setScanStatus('error'); scanningRef2.current = false; return; }
+          stopScan();
+          setState(d.alreadyCheckedIn ? 'already' : 'success');
+        } catch {
+          setScanErr('Network error. Try again.'); setScanStatus('error'); scanningRef2.current = false;
+        }
+      });
+      controlsRef2.current = controls as IScanControls;
+    } catch {
+      setScanErr('Camera access denied or unavailable.'); setScanStatus('error');
+    }
+  }
 
   async function checkIn() {
     setError('');
@@ -143,6 +197,55 @@ export default function MyQrClient({ name, email, department, isCheckedIn: initi
               <p className="text-[11px] text-slate-400 text-center">
                 Tap to share your location and verify you are at the venue
               </p>
+
+              {/* Venue QR scan toggle */}
+              {!scanOpen && (
+                <button onClick={openScanner}
+                  className="w-full py-3 rounded-2xl font-bold text-slate-600 border border-slate-200 flex items-center justify-center gap-2 text-sm hover:bg-slate-50 transition active:scale-[0.98]">
+                  <ScanLine size={15} />
+                  Scan Venue QR instead
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Inline camera scanner (venue QR) */}
+          {scanOpen && (
+            <div className="w-full space-y-3">
+              <div className="relative rounded-2xl overflow-hidden bg-slate-900">
+                <video ref={videoRef2} className="w-full aspect-[4/3] object-cover" playsInline muted autoPlay />
+                {/* Corner-bracket overlay */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="relative w-44 h-44">
+                    {(['top-0 left-0 border-t-2 border-l-2','top-0 right-0 border-t-2 border-r-2',
+                       'bottom-0 left-0 border-b-2 border-l-2','bottom-0 right-0 border-b-2 border-r-2'] as const
+                    ).map(cls => <div key={cls} className={`absolute w-7 h-7 ${cls} border-orange-400 rounded-sm`} />)}
+                    <div className="absolute inset-x-0 top-1/2 h-px bg-orange-400/60 animate-pulse" />
+                  </div>
+                </div>
+                {scanStatus === 'verifying' && (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3 text-white">
+                    <Loader2 size={28} className="animate-spin" />
+                    <p className="text-sm font-semibold">Verifying…</p>
+                  </div>
+                )}
+                <p className="absolute bottom-2 inset-x-0 text-center text-white/60 text-[11px]">
+                  Point camera at the venue QR code
+                </p>
+              </div>
+
+              {scanErr && (
+                <div className="rounded-2xl px-4 py-3 text-sm font-medium flex items-start gap-2"
+                  style={{ background: '#FEF2F2', color: '#DC2626' }}>
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                  <span>{scanErr}</span>
+                </div>
+              )}
+
+              <button onClick={stopScan}
+                className="w-full py-3 rounded-2xl font-bold text-slate-500 border border-slate-200 flex items-center justify-center gap-2 text-sm hover:bg-slate-50 transition">
+                <X size={14} /> Cancel
+              </button>
             </div>
           )}
         </div>

@@ -3,8 +3,11 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
-import { getAppState, getAttendance, getUserById } from '@/lib/db';
+import { getAppState, getAttendance, getUserById, getEmployeeByEmail, getRoomForEmployee, getAadharByEmployee } from '@/lib/db';
+import { isS3Configured } from '@/lib/s3';
 import MyQrClient from '@/components/MyQrClient';
+import RoomCard from '@/components/RoomCard';
+import AadharUploadClient from '@/components/AadharUploadClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +18,9 @@ export default async function MePage() {
   const appState = getAppState();
   const user = getUserById(session.id);
   const attendance = getAttendance(session.id);
+  const emp    = getEmployeeByEmail(session.email);
+  const room   = emp ? getRoomForEmployee(emp.id) : null;
+  const aadhar = emp ? getAadharByEmployee(emp.id) : null;
 
   return (
     <>
@@ -29,6 +35,10 @@ export default async function MePage() {
           eventName={appState.event_name}
         />
 
+
+        {room && <RoomCard room={room} />}
+
+        {emp && <AadharUploadClient initial={aadhar} useS3={isS3Configured()} />}
 
         <Link
           href="/my-photos"

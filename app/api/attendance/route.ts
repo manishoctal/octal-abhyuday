@@ -46,15 +46,18 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
 
-  // ── Admin QR-scan path (legacy) ──────────────────────────────
+  // ── Admin QR-scan path ───────────────────────────────────────
   if ('userId' in body) {
     const adminOrErr = await requireAdmin();
     if (isErrorResponse(adminOrErr)) return adminOrErr;
     const { userId } = body as { userId: number };
     if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+    const { getUserById } = await import('@/lib/db');
+    const user = getUserById(Number(userId));
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
     const result = checkIn(Number(userId));
     if (result.changes > 0) awardPoints(Number(userId), 'check_in', 15);
-    return NextResponse.json({ ok: true, alreadyCheckedIn: result.changes === 0 });
+    return NextResponse.json({ ok: true, alreadyCheckedIn: result.changes === 0, name: user.name, department: user.department });
   }
 
   // ── Employee self-check-in path ───────────────────────────────

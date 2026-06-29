@@ -558,6 +558,23 @@ export function setVenueConfig(lat: number, lng: number, radiusKm: number) {
   setSetting('venue_radius_km', String(radiusKm));
 }
 
+export function getCheckinToken(): string {
+  let token = getSetting('checkin_token');
+  if (!token) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    token = require('crypto').randomBytes(16).toString('hex') as string;
+    setSetting('checkin_token', token);
+  }
+  return token;
+}
+
+export function regenerateCheckinToken(): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const token = require('crypto').randomBytes(16).toString('hex') as string;
+  setSetting('checkin_token', token);
+  return token;
+}
+
 // ---------- push subscriptions ----------
 
 export function savePushSubscription(userId: number, platform: 'web' | 'android' | 'ios', subscription: string) {
@@ -692,6 +709,30 @@ try {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_points_user_activity ON points(user_id, activity)');
 } catch { /* duplicates already exist — safe to ignore, INSERT OR IGNORE will handle dedup */ }
 
+// Room allocation + Aadhar tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_number TEXT NOT NULL UNIQUE,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS room_allocations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    UNIQUE(employee_id)
+  );
+  CREATE TABLE IF NOT EXISTS aadhar_cards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    front_url TEXT,
+    back_url TEXT,
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(employee_id)
+  );
+`);
+
 // Add thumbnail_url to photos if missing
 {
   const photoCols = (db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]).map(c => c.name);
@@ -809,6 +850,114 @@ export function getTagsForPhoto(photoId: number) {
      FROM photo_tags pt JOIN employees e ON e.id = pt.employee_id
      WHERE pt.photo_id = ?`
   ).all(photoId) as { employee_id: number; confidence: number; name: string; employee_code: string }[];
+}
+
+// ---------- rooms ----------
+
+export interface Room {
+  id: number; room_number: string; notes: string | null; created_at: string;
+}
+export interface RoomWithOccupants extends Room {
+  employees: Array<{ id: number; name: string; employee_code: string; profile_photo_url: string | null }>;
+}
+
+export function createRoom(room_number: string, notes?: string): Room {
+  const r = db.prepare(
+    'INSERT INTO rooms (room_number, notes) VALUES (?, ?) RETURNING *'
+  ).get(room_number.trim(), notes?.trim() ?? null) as Room;
+  return r;
+}
+
+export function deleteRoom(id: number) {
+  db.prepare('DELETE FROM rooms WHERE id = ?').run(id);
+}
+
+export function listRoomsWithOccupants(): RoomWithOccupants[] {
+  const rows = db.prepare(
+    `SELECT r.id, r.room_number, r.notes, r.created_at,
+       COALESCE(json_group_array(
+         CASE WHEN e.id IS NOT NULL THEN
+           json_object('id', e.id, 'name', e.name, 'employee_code', e.employee_code,
+                       'profile_photo_url', e.profile_photo_url)
+         ELSE NULL END
+       ) FILTER (WHERE e.id IS NOT NULL), '[]') as employees_json
+     FROM rooms r
+     LEFT JOIN room_allocations ra ON ra.room_id = r.id
+     LEFT JOIN employees e ON e.id = ra.employee_id
+     GROUP BY r.id
+     ORDER BY r.room_number`
+  ).all() as Array<Room & { employees_json: string }>;
+  return rows.map(r => ({ ...r, employees: JSON.parse(r.employees_json) }));
+}
+
+export function assignToRoom(room_id: number, employee_id: number) {
+  db.prepare(
+    'INSERT OR REPLACE INTO room_allocations (room_id, employee_id) VALUES (?, ?)'
+  ).run(room_id, employee_id);
+}
+
+export function removeFromRoom(employee_id: number) {
+  db.prepare('DELETE FROM room_allocations WHERE employee_id = ?').run(employee_id);
+}
+
+export function getRoomForEmployee(employee_id: number): (Room & { roommates: Array<{ id: number; name: string; employee_code: string }> }) | null {
+  const row = db.prepare(
+    `SELECT r.*,
+       COALESCE(json_group_array(
+         json_object('id', e.id, 'name', e.name, 'employee_code', e.employee_code)
+       ) FILTER (WHERE e.id IS NOT NULL AND e.id != ?), '[]') as roommates_json
+     FROM rooms r
+     JOIN room_allocations ra ON ra.room_id = r.id AND ra.employee_id = ?
+     LEFT JOIN room_allocations ra2 ON ra2.room_id = r.id
+     LEFT JOIN employees e ON e.id = ra2.employee_id
+     GROUP BY r.id`
+  ).get(employee_id, employee_id) as (Room & { roommates_json: string }) | undefined;
+  if (!row) return null;
+  return { ...row, roommates: JSON.parse(row.roommates_json) };
+}
+
+// ---------- aadhar ----------
+
+export interface AadharCard {
+  id: number; employee_id: number; front_url: string | null; back_url: string | null; uploaded_at: string;
+}
+export interface AadharWithEmployee {
+  employee_id: number; name: string; employee_code: string; department: string | null;
+  profile_photo_url: string | null; room_number: string | null;
+  front_url: string | null; back_url: string | null; uploaded_at: string | null;
+}
+
+export function upsertAadharCard(employee_id: number, front_url?: string | null, back_url?: string | null) {
+  db.prepare(
+    `INSERT INTO aadhar_cards (employee_id, front_url, back_url)
+     VALUES (?, ?, ?)
+     ON CONFLICT(employee_id) DO UPDATE SET
+       front_url = COALESCE(excluded.front_url, aadhar_cards.front_url),
+       back_url  = COALESCE(excluded.back_url,  aadhar_cards.back_url),
+       uploaded_at = datetime('now')`
+  ).run(employee_id, front_url ?? null, back_url ?? null);
+}
+
+export function getAadharByEmployee(employee_id: number): AadharCard | null {
+  return db.prepare('SELECT * FROM aadhar_cards WHERE employee_id = ?').get(employee_id) as AadharCard | null ?? null;
+}
+
+export function deleteAadharCard(employee_id: number) {
+  db.prepare('DELETE FROM aadhar_cards WHERE employee_id = ?').run(employee_id);
+}
+
+export function listAadharWithRoomInfo(): AadharWithEmployee[] {
+  return db.prepare(
+    `SELECT e.id as employee_id, e.name, e.employee_code, e.department, e.profile_photo_url,
+       r.room_number,
+       ac.front_url, ac.back_url, ac.uploaded_at
+     FROM employees e
+     LEFT JOIN room_allocations ra ON ra.employee_id = e.id
+     LEFT JOIN rooms r ON r.id = ra.room_id
+     LEFT JOIN aadhar_cards ac ON ac.employee_id = e.id
+     WHERE e.is_active = 1
+     ORDER BY r.room_number NULLS LAST, e.name`
+  ).all() as AadharWithEmployee[];
 }
 
 // ---------- photos ----------

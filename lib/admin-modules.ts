@@ -127,4 +127,12 @@ export const adminModules: AdminModule[] = [
     href: '/admin/app-release',
     status: 'live',
   },
+  {
+    id: 'rooms',
+    name: 'Room Allocation',
+    emoji: '🏨',
+    description: 'Assign employees to hotel rooms, upload Aadhar cards (front & back), and download a ZIP grouped by room for hotel reception',
+    href: '/admin/rooms',
+    status: 'live',
+  },
 ];
