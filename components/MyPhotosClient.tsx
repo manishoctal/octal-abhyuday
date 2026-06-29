@@ -6,6 +6,7 @@ import {
   Camera, Download, AlertTriangle, CheckCircle2, ImageOff,
   RefreshCw, ScanFace, Cpu, Search, Zap, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import { isNative } from '@/lib/platform';
 
 interface Photo {
   id: number;
@@ -166,6 +167,44 @@ export default function MyPhotosClient() {
 
   const searching = ['detecting', 'vectorising', 'scanning', 'matching'].includes(phase);
 
+  /**
+   * Opens the FRONT camera.
+   * - Native (Android/iOS): uses @capacitor/camera with CameraDirection.Front so the
+   *   OS camera UI always starts on the front lens — the HTML `capture` attribute is
+   *   ignored by Android's WebView.
+   * - Web/PWA: falls back to the hidden <input capture="user"> which works in browsers.
+   */
+  async function takeSelfie() {
+    if (isNative()) {
+      try {
+        const { Camera: CapCamera, CameraSource, CameraDirection, CameraResultType } =
+          await import('@capacitor/camera');
+        const photo = await CapCamera.getPhoto({
+          quality:             90,
+          source:              CameraSource.Camera,
+          direction:           CameraDirection.Front,
+          resultType:          CameraResultType.DataUrl,
+          presentationStyle:  'fullscreen',
+          correctOrientation:  true,
+        });
+        if (!photo.dataUrl) return;
+        // Convert data URL → Blob → File so handleFile() can reuse the same path
+        const fetchRes = await fetch(photo.dataUrl);
+        const blob     = await fetchRes.blob();
+        const file     = new File([blob], 'selfie.jpg', { type: blob.type || 'image/jpeg' });
+        handleFile(file);
+      } catch (e: unknown) {
+        // User cancelled — ignore; any real error surfaces via handleFile
+        if (e instanceof Error && !e.message.includes('cancelled') && !e.message.includes('canceled')) {
+          setError('Could not open camera. Please try again.');
+          setPhase('error');
+        }
+      }
+    } else {
+      fileRef.current?.click();
+    }
+  }
+
   return (
     <div className="space-y-4 pb-24">
       <input ref={fileRef} type="file" accept="image/*" capture="user" className="hidden"
@@ -198,7 +237,7 @@ export default function MyPhotosClient() {
                   </p>
                 </div>
                 <button
-                  onClick={() => fileRef.current?.click()}
+                  onClick={takeSelfie}
                   className="w-full py-4 rounded-2xl font-black text-white text-base flex items-center justify-center gap-2"
                   style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', boxShadow: '0 8px 24px rgba(255,122,0,0.3)' }}
                 >
