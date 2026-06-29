@@ -740,6 +740,21 @@ db.exec(`
     db.exec('ALTER TABLE photos ADD COLUMN thumbnail_url TEXT');
   }
 }
+
+// Seed master room list — INSERT OR IGNORE keeps existing notes/allocations intact
+{
+  const masterRooms = [
+    '101','102','103','104','105','106',
+    '201','202','203','204','205','206',
+    '301','302','303','304','305','306','307','308','309','310',
+    '401','402','403','404','405','406','407','408','409','410',
+    '602','603','604','605',
+    '702','703','704','705',
+  ];
+  const seedRoom = db.prepare('INSERT OR IGNORE INTO rooms (room_number) VALUES (?)');
+  const seedAll  = db.transaction((rooms: string[]) => rooms.forEach(n => seedRoom.run(n)));
+  seedAll(masterRooms);
+}
 // Promote legacy pending photos (approved=0) to visible (approved=1)
 db.prepare('UPDATE photos SET approved=1 WHERE approved=0').run();
 
