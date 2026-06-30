@@ -1066,11 +1066,11 @@ export function removeFromRoom(employee_id: number) {
   db.prepare('DELETE FROM room_allocations WHERE employee_id = ?').run(employee_id);
 }
 
-export function getRoomForEmployee(employee_id: number): (Room & { roommates: Array<{ id: number; name: string; employee_code: string }> }) | null {
+export function getRoomForEmployee(employee_id: number): (Room & { roommates: Array<{ id: number; name: string; employee_code: string; profile_photo_url: string | null }> }) | null {
   const row = db.prepare(
     `SELECT r.*,
        COALESCE(json_group_array(
-         json_object('id', e.id, 'name', e.name, 'employee_code', e.employee_code)
+         json_object('id', e.id, 'name', e.name, 'employee_code', e.employee_code, 'profile_photo_url', e.profile_photo_url)
        ) FILTER (WHERE e.id IS NOT NULL AND e.id != ?), '[]') as roommates_json
      FROM rooms r
      JOIN room_allocations ra ON ra.room_id = r.id AND ra.employee_id = ?
