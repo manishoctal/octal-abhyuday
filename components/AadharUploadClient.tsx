@@ -44,14 +44,16 @@ export default function AadharUploadClient({ initial, useS3 }: Props) {
       let url: string;
 
       if (useS3) {
+        const ct = file.type || 'image/jpeg';
         const res = await fetch('/api/me/aadhar', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: file.name, contentType: file.type, side }),
+          body: JSON.stringify({ filename: file.name, contentType: ct, side }),
         });
         if (!res.ok) throw new Error('Presign failed');
         const { presignedUrl, publicUrl } = await res.json();
-        await fetch(presignedUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+        const putRes = await fetch(presignedUrl, { method: 'PUT', headers: { 'Content-Type': ct }, body: file });
+        if (!putRes.ok) throw new Error(`S3 upload failed: ${putRes.status}`);
         url = publicUrl;
         await fetch('/api/me/aadhar', {
           method: 'POST',

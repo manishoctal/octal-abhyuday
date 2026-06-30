@@ -68,6 +68,7 @@ export default function ProfileClient({ name, email, profilePhotoUrl, required, 
         const { presignedUrl, publicUrl } = await presignRes.json();
 
         await xhrPut(presignedUrl, file, file.type || 'image/jpeg', pct => setPhotoProgress(pct));
+        // xhrPut already throws on non-2xx — publicUrl is only used if upload succeeded
         finalPhotoUrl = publicUrl;
         setPhotoProgress(100);
 

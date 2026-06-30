@@ -70,10 +70,12 @@ export async function PUT(req: Request) {
   const empId = await getEmployeeId(userOrErr.email);
   if (!empId) return NextResponse.json({ error: 'Employee record not found' }, { status: 404 });
 
-  const { filename, contentType, side } = await req.json();
-  if (!filename || !contentType || !['front', 'back'].includes(side)) {
+  const { filename, contentType: rawCt, side } = await req.json();
+  if (!filename || !['front', 'back'].includes(side)) {
     return NextResponse.json({ error: 'Invalid params' }, { status: 400 });
   }
+  // Normalise content type — mobile browsers sometimes send empty string
+  const contentType = rawCt || 'image/jpeg';
 
   const ext = normalizeExt(filename);
   const key = `abhyuday-2026/aadhar/${empId}-${side}-${Date.now()}.${ext}`;
