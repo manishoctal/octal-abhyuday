@@ -1307,6 +1307,7 @@ export function createEmployee(
     `INSERT INTO employees (employee_code, name, email, department, gender, profile_photo_url)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl);
+  syncCandidatePhoto(email, profilePhotoUrl);
   return db.prepare('SELECT * FROM employees WHERE id = ?').get(r.lastInsertRowid) as Employee;
 }
 
@@ -1318,6 +1319,7 @@ export function updateEmployee(
   db.prepare(
     `UPDATE employees SET employee_code=?, name=?, email=?, department=?, gender=?, profile_photo_url=?, is_active=? WHERE id=?`
   ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl, isActive, id);
+  syncCandidatePhoto(email, profilePhotoUrl);
 }
 
 export function deleteEmployee(id: number) {
