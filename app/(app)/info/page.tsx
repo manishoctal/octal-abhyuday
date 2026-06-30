@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import { getAppState, listEventInfo, getModuleConfig } from '@/lib/db';
 import InfoClient from '@/components/InfoClient';
 import ModuleDisabled from '@/components/ModuleDisabled';
@@ -21,7 +20,7 @@ export default async function InfoPage() {
       <main className="max-w-lg mx-auto px-4 pt-4">
         <InfoClient initial={listEventInfo()} />
       </main>
-      <BottomNav isAdmin={session.isAdmin} />
+
     </>
   );
 }

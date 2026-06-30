@@ -168,8 +168,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: linear-gradient(160deg, #020617 0%, #1e1b4b 50%, #020617 100%);
-  color: white;
+  background: #FFFFFF;
+  color: #0F172A;
   pointer-events: none;
   transition: opacity 0.5s ease;
 }
@@ -195,7 +195,7 @@ body {
 #web-splash .splash-by {
   font-size: 12px; font-weight: 600;
   letter-spacing: 0.1em; text-transform: uppercase;
-  color: rgba(255,255,255,0.4);
+  color: rgba(15,23,42,0.4);
 }
 @keyframes shimmer {
   to { background-position: 200% center; }

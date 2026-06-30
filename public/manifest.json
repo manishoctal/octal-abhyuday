@@ -4,7 +4,7 @@
   "description": "Octal IT Solution event companion — schedule, voting, Q&A, gallery, and more",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F1035",
+  "background_color": "#FFFFFF",
   "theme_color": "#FF7A00",
   "orientation": "portrait",
   "icons": [

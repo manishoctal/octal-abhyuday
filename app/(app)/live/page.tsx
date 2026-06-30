@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import { getAppState } from '@/lib/db';
 import { getLiveSession, getQuestion } from '@/lib/qa';
 import LiveClient from '@/components/LiveClient';
@@ -35,7 +34,7 @@ export default async function LivePage() {
       <main className="max-w-lg mx-auto px-4 pt-6 pb-8">
         <LiveClient initial={initial} />
       </main>
-      <BottomNav isAdmin={session.isAdmin} />
+
     </>
   );
 }

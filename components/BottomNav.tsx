@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { Home, CalendarDays, Zap, ImageIcon, User } from 'lucide-react';
 import { useRealtime } from './useRealtime';
@@ -12,12 +12,15 @@ const fetcher = (u: string) => fetch(u).then(r => r.json());
 
 export default function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   const path = usePathname();
+  const searchParams = useSearchParams();
   const { data } = useSWR('/api/state', fetcher, { refreshInterval: 30000 });
   useRealtime(['/api/state']);
   usePushRegistration();
   useWebPushSubscription(isAdmin);
 
   const isLive = data?.state?.voting_state === 'live' || data?.state?.voting_state === 'paused';
+  const hideForRequiredProfile = path === '/profile' && searchParams.get('required') === '1';
+  if (hideForRequiredProfile) return null;
 
   const tabs = [
     { href: '/',         label: 'Home',     Icon: Home,        match: (p: string) => p === '/' },

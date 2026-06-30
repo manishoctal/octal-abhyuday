@@ -122,16 +122,16 @@ export default function AadharUploadClient({ initial, useS3 }: Props) {
                 {img ? (
                   <>
                     <Image src={img} alt={`Aadhar ${side}`} fill className="object-cover" unoptimized />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                    <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5">
                       <button
                         onClick={e => { e.stopPropagation(); setViewSide(side); }}
-                        className="p-2 rounded-full bg-white/90 text-slate-700 hover:bg-white transition"
+                        className="p-1.5 rounded-full bg-white shadow-md text-slate-700 active:scale-90 transition"
                       >
                         <Eye size={14} />
                       </button>
                       <button
                         onClick={e => { e.stopPropagation(); ref(side).current?.click(); }}
-                        className="p-2 rounded-full bg-white/90 text-slate-700 hover:bg-white transition"
+                        className="p-1.5 rounded-full bg-white shadow-md text-slate-700 active:scale-90 transition"
                       >
                         <Upload size={14} />
                       </button>

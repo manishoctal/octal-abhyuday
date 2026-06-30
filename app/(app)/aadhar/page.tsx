@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import { getAppState, getEmployeeByEmail, getAadharByEmployee } from '@/lib/db';
 import { isS3Configured } from '@/lib/s3';
 import AadharUploadClient from '@/components/AadharUploadClient';
@@ -27,7 +26,7 @@ export default async function AadharPage() {
         </p>
         <AadharUploadClient initial={aadhar} useS3={isS3Configured()} />
       </main>
-      <BottomNav isAdmin={session.isAdmin} />
+
     </>
   );
 }

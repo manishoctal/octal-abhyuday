@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import { getAppState, getLeaderboard, getUserPoints, getModuleConfig } from '@/lib/db';
 import LeaderboardClient from '@/components/LeaderboardClient';
 import ModuleDisabled from '@/components/ModuleDisabled';
@@ -30,7 +29,7 @@ export default async function LeaderboardPage() {
           myId={session.id}
         />
       </main>
-      <BottomNav isAdmin={session.isAdmin} />
+
     </>
   );
 }

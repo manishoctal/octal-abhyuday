@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import { getAppState, getUserById } from '@/lib/db';
 import { isS3Configured } from '@/lib/s3';
 import ProfileClient from '@/components/ProfileClient';
@@ -37,7 +36,7 @@ export default async function ProfilePage({
           useS3={isS3Configured()}
         />
       </main>
-      {!required && <BottomNav isAdmin={session.isAdmin} />}
+
     </>
   );
 }

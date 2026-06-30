@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import BottomNav from '@/components/BottomNav';
 import { getAppState, getAttendance, getEmployeeByEmail, getRoomForEmployee, getModuleConfig } from '@/lib/db';
 import MyQrClient from '@/components/MyQrClient';
 import RoomCard from '@/components/RoomCard';
@@ -85,7 +84,7 @@ export default async function MePage() {
           </svg>
         </Link>
       </main>
-      <BottomNav isAdmin={session.isAdmin} />
+
     </>
   );
 }
