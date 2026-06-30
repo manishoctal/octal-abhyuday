@@ -33,22 +33,29 @@ export function usePushRegistration() {
         // Attach listener BEFORE calling register() so we don't miss the event
         await PushNotifications.addListener('registration', async ({ value: token }) => {
           const platform = getPlatform();
+          console.log(`[push] FCM token obtained (${platform}), saving to server...`);
           try {
-            await fetch('/api/push/subscribe', {
+            const res = await fetch('/api/push/subscribe', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ subscription: token, platform }),
             });
-          } catch {
-            // Network failure — the token is in the DB from a previous run or
-            // will be retried on the next app cold start (_attempted resets).
+            if (res.ok) {
+              console.log('[push] subscription saved successfully');
+            } else {
+              const body = await res.text().catch(() => '');
+              console.error(`[push] subscribe endpoint returned ${res.status}: ${body}`);
+              _attempted = false; // allow retry on next mount
+            }
+          } catch (e) {
+            console.error('[push] network error saving subscription:', e);
+            _attempted = false; // allow retry on next mount
           }
         });
 
         await PushNotifications.addListener('registrationError', (err) => {
           console.error('[push] FCM registration error:', err.error);
-          // Reset so a retry is possible on next app start
-          _attempted = false;
+          _attempted = false; // reset so a retry is possible on next app start
         });
 
         // Trigger FCM token fetch — fires 'registration' listener above
