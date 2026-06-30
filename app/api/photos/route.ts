@@ -56,10 +56,17 @@ export async function POST(req: Request) {
       id: addPhoto(userOrErr.id, userOrErr.name, url, null, null),
       url,
     }));
-    for (const { id, url } of results) {
+    for (const { id } of results) {
       const photo = getPhotoById(id)!;
-      generateThumbnailAsync({ ...photo, url }, DATA_DIR()).catch(() => {});
-      tagPhotoById(id, base).catch(() => setPhotoTagStatus(id, 'failed'));
+      generateThumbnailAsync({ ...photo, url: photo.url }, DATA_DIR()).catch(() => {});
+      setTimeout(() => {
+        tagPhotoById(id, base)
+          .then(r => console.log(`[photos/tag] photo ${id}: ${r.tagged} matched, ${r.faces} faces`))
+          .catch(err => {
+            console.error(`[photos/tag] photo ${id} failed:`, err?.message ?? err);
+            setPhotoTagStatus(id, 'failed');
+          });
+      }, 3000);
     }
     return NextResponse.json({ uploaded: results.length, results });
   }
@@ -89,7 +96,15 @@ export async function POST(req: Request) {
     results.push({ id, url });
     const photo = getPhotoById(id)!;
     generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
-    tagPhotoById(id, base).catch(() => setPhotoTagStatus(id, 'failed'));
+    // Delay tagging so the response is sent first and the upload file route is free to serve.
+    setTimeout(() => {
+      tagPhotoById(id, base)
+        .then(r => console.log(`[photos/tag] photo ${id}: ${r.tagged} matched, ${r.faces} faces`))
+        .catch(err => {
+          console.error(`[photos/tag] photo ${id} failed:`, err?.message ?? err);
+          setPhotoTagStatus(id, 'failed');
+        });
+    }, 3000);
   }
 
   return NextResponse.json({ uploaded: results.length, results });

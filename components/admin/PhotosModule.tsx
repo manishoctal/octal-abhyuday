@@ -107,7 +107,7 @@ function StatusPill({ ok, children }: { ok: boolean; children: React.ReactNode }
   );
 }
 
-function ProcessingPanel() {
+function ProcessingPanel({ onRefresh }: { onRefresh?: () => void }) {
   const [thumbStats,   setThumbStats]   = useState<ThumbStats | null>(null);
   const [regStats,     setRegStats]     = useState<FaceRegStats | null>(null);
   const [tagStats,     setTagStats]     = useState<FaceTagStats | null>(null);
@@ -179,7 +179,7 @@ function ProcessingPanel() {
         ? 'All photos already tagged.'
         : `Done — ${d.tagged} match${d.tagged !== 1 ? 'es' : ''} in ${d.processed} photo${d.processed !== 1 ? 's' : ''}${d.failed ? ` · ${d.failed} still failed` : ''}`;
       notify(msg, d.failed === 0);
-      await loadStats();
+      await Promise.all([loadStats(), onRefresh?.()]);
     } finally { setPendingLoading(false); }
   }
 
@@ -769,7 +769,7 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
         {/* ── Left sidebar ──────────────────────────────── */}
         <div className="space-y-4">
           <UploadPanel useS3={useS3} onDone={refresh} />
-          <ProcessingPanel />
+          <ProcessingPanel onRefresh={refresh} />
 
           {/* Danger zone */}
           {photos.length > 0 && (

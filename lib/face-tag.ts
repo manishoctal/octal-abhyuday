@@ -40,7 +40,12 @@ export async function tagPhotoById(
   if (!photo) return { tagged: 0, faces: 0 };
 
   const allEmbeddings = getAllFaceEmbeddings();
-  if (!allEmbeddings.length) return { tagged: 0, faces: 0 };
+  if (!allEmbeddings.length) {
+    // No faces registered yet — mark done so it's not stuck as pending forever.
+    // It will be re-tagged when "Tag All Photos" is run after indexing employees.
+    setPhotoTagStatus(photoId, 'done');
+    return { tagged: 0, faces: 0 };
+  }
 
   // Resolve to an absolute URL the face service can reach
   const photoUrl = photo.url.startsWith('http') ? photo.url : `${baseUrl}${photo.url}`;
