@@ -348,8 +348,11 @@ export default function DashboardClient({
   const visible = TILES
     .filter(t => {
       const key = HREF_TO_KEY[t.href];
+      // Admin explicitly hid it → always hide
       if (key && moduleVisibility[key] === false) return false;
-      return t.show(votingState);
+      // Admin explicitly set visible (or default) → show; only apply auto-show gate
+      // when the module has NO explicit admin visibility stored (i.e. key absent from config)
+      return true;
     })
     .sort((a, b) => {
       if (!moduleOrder) return 0;

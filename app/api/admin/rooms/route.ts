@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
-import { createRoom, deleteRoom, listRoomsWithOccupants } from '@/lib/db';
+import { createRoom, deleteRoom, listRoomsWithOccupants, updateRoom } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +18,19 @@ export async function POST(req: Request) {
   try {
     const room = createRoom(room_number, notes);
     return NextResponse.json({ room });
+  } catch {
+    return NextResponse.json({ error: 'Room number already exists' }, { status: 409 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  const a = await requireAdmin();
+  if (isErrorResponse(a)) return a;
+  const { id, room_number, notes } = await req.json().catch(() => ({}));
+  if (!id || !room_number?.trim()) return NextResponse.json({ error: 'id and room_number required' }, { status: 400 });
+  try {
+    updateRoom(Number(id), room_number.trim(), notes ?? null);
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Room number already exists' }, { status: 409 });
   }

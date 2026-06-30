@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Hotel, Plus, Trash2, X, Users, Download, Upload, CheckCircle2,
-  Loader2, AlertTriangle, Search, UserPlus, FileImage, Eye, ScanLine,
+  Loader2, AlertTriangle, Search, UserPlus, FileImage, Eye, ScanLine, Pencil, Check,
 } from 'lucide-react';
 
 /* ─── Types ──────────────────────────────────────────────── */
@@ -260,6 +260,10 @@ function RoomCard({
   const [showAdd, setShowAdd]   = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing]   = useState(false);
+  const [editNum, setEditNum]   = useState(room.room_number);
+  const [editNotes, setEditNotes] = useState(room.notes ?? '');
+  const [saving, setSaving]     = useState(false);
 
   const occupantIds = new Set(room.employees.map(e => e.id));
 
@@ -285,6 +289,25 @@ function RoomCard({
     onRefresh();
   }
 
+  async function saveEdit() {
+    if (!editNum.trim()) return;
+    setSaving(true);
+    await fetch('/api/admin/rooms', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: room.id, room_number: editNum.trim(), notes: editNotes.trim() || null }),
+    });
+    setSaving(false);
+    setEditing(false);
+    onRefresh();
+  }
+
+  function cancelEdit() {
+    setEditNum(room.room_number);
+    setEditNotes(room.notes ?? '');
+    setEditing(false);
+  }
+
   return (
     <>
       {showAdd && (
@@ -302,17 +325,53 @@ function RoomCard({
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-orange-400 flex items-center justify-center shadow-sm shrink-0">
             <Hotel size={18} className="text-white" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-extrabold text-slate-900">Room {room.room_number}</p>
-            {room.notes && <p className="text-xs text-slate-400 truncate">{room.notes}</p>}
-          </div>
-          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-            {room.employees.length} / 3
-          </span>
-          <button onClick={deleteRoom} disabled={deleting}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40">
-            {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-          </button>
+          {editing ? (
+            <div className="flex-1 min-w-0 space-y-1">
+              <input
+                value={editNum}
+                onChange={e => setEditNum(e.target.value)}
+                placeholder="Room number"
+                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-300"
+              />
+              <input
+                value={editNotes}
+                onChange={e => setEditNotes(e.target.value)}
+                placeholder="Notes (optional)"
+                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-300"
+              />
+            </div>
+          ) : (
+            <div className="flex-1 min-w-0">
+              <p className="font-extrabold text-slate-900">Room {room.room_number}</p>
+              {room.notes && <p className="text-xs text-slate-400 truncate">{room.notes}</p>}
+            </div>
+          )}
+          {editing ? (
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={saveEdit} disabled={saving || !editNum.trim()}
+                className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition disabled:opacity-40">
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              </button>
+              <button onClick={cancelEdit}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition">
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
+                {room.employees.length} / 3
+              </span>
+              <button onClick={() => setEditing(true)}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-brand-500 hover:bg-brand-50 transition">
+                <Pencil size={13} />
+              </button>
+              <button onClick={deleteRoom} disabled={deleting}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40">
+                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Occupants */}

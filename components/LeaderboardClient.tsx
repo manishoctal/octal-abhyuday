@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { useRealtime } from './useRealtime';
 import type { LeaderboardRow } from '@/lib/db';
@@ -10,6 +11,13 @@ const ACTIVITY_ICON: Record<string, string> = {
   voted: '🗳️', check_in: '🪪', feedback: '⭐', qa_answer: '💬', photo_upload: '📷',
 };
 
+const POINTS_HOW: { icon: string; label: string; pts: number }[] = [
+  { icon: '🗳️', label: 'Vote',         pts: 10 },
+  { icon: '🪪', label: 'Check-in',     pts: 15 },
+  { icon: '📷', label: 'Upload photo', pts: 15 },
+  { icon: '⭐', label: 'Feedback',     pts: 20 },
+];
+
 interface Props {
   initial: LeaderboardRow[];
   myPoints: number;
@@ -17,8 +25,12 @@ interface Props {
   myId: number;
 }
 
-function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
+function Avatar({ name, photoUrl, size = 'md' }: { name: string; photoUrl?: string | null; size?: 'sm' | 'md' | 'lg' }) {
   const s = size === 'lg' ? 'w-14 h-14 text-lg' : size === 'md' ? 'w-10 h-10 text-sm' : 'w-8 h-8 text-xs';
+  if (photoUrl) return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={photoUrl} alt={name} className={`${s} rounded-full object-cover shrink-0`} />
+  );
   return (
     <div
       className={`${s} rounded-full flex items-center justify-center font-bold text-white shrink-0`}
@@ -36,6 +48,8 @@ export default function LeaderboardClient({ initial, myPoints, myRank, myId }: P
   });
   useRealtime(['/api/leaderboard']);
 
+  const [infoOpen, setInfoOpen] = useState(false);
+
   const board: LeaderboardRow[] = data?.board ?? initial;
   const pts = data?.myPoints ?? myPoints;
   const rank = data?.myRank ?? myRank;
@@ -45,9 +59,55 @@ export default function LeaderboardClient({ initial, myPoints, myRank, myId }: P
 
   const podium = board.slice(0, 3);
   const rest   = board.slice(3);
+  void rest;
 
   return (
     <div className="space-y-5 pb-4">
+
+      {/* ── Info banner ───────────────────────────── */}
+      <div className="card overflow-hidden">
+        <button
+          onClick={() => setInfoOpen(o => !o)}
+          className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
+        >
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-lg" style={{ background: '#FFF4E8' }}>
+            🏆
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-slate-900 text-[14px]">Why does the leaderboard matter?</p>
+            <p className="text-xs text-slate-400">Tap to see how to earn points</p>
+          </div>
+          <svg
+            width="16" height="16" viewBox="0 0 16 16" fill="none"
+            className={`shrink-0 text-slate-400 transition-transform duration-200 ${infoOpen ? 'rotate-180' : ''}`}
+          >
+            <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+
+        {infoOpen && (
+          <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-3">
+            <p className="text-sm text-slate-600 leading-relaxed">
+              The leaderboard tracks participation across the event. The more you engage, the higher you climb —
+              it&apos;s a fun way to see who&apos;s the most active attendee and celebrate top contributors.
+            </p>
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">How to earn points</p>
+              <div className="grid grid-cols-2 gap-2">
+                {POINTS_HOW.map(({ icon, label, pts: p }) => (
+                  <div key={label} className="flex items-center gap-2.5 bg-slate-50 rounded-xl px-3 py-2.5">
+                    <span className="text-lg">{icon}</span>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-semibold text-slate-700 truncate">{label}</p>
+                      <p className="text-[11px] font-bold" style={{ color: '#FE9234' }}>+{p} pts</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── My score card ─────────────────────────── */}
       <div className="card px-5 py-4" style={{ borderLeft: '3px solid #FE9234' }}>
@@ -120,7 +180,7 @@ export default function LeaderboardClient({ initial, myPoints, myRank, myId }: P
                     {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
                   </span>
 
-                  <Avatar name={row.name} size="sm" />
+                  <Avatar name={row.name} photoUrl={row.profile_photo_url} size="sm" />
 
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[14px] text-slate-900 truncate">
@@ -150,12 +210,22 @@ function PodiumSlot({ row, place, myId, barH }: { row: LeaderboardRow; place: nu
   return (
     <div className="flex flex-col items-center flex-1">
       {/* Avatar */}
-      <div
-        className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white text-base mb-1 shadow-card"
-        style={{ background: isMe ? '#FE9234' : '#0F172A' }}
-      >
-        {row.name.charAt(0).toUpperCase()}
-      </div>
+      {row.profile_photo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={row.profile_photo_url}
+          alt={row.name}
+          className="w-11 h-11 rounded-full object-cover mb-1 shadow-card"
+          style={isMe ? { outline: '2px solid #FE9234' } : {}}
+        />
+      ) : (
+        <div
+          className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white text-base mb-1 shadow-card"
+          style={{ background: isMe ? '#FE9234' : '#0F172A' }}
+        >
+          {row.name.charAt(0).toUpperCase()}
+        </div>
+      )}
       <p className="text-[11px] font-semibold text-slate-700 truncate max-w-[56px] text-center">
         {row.name.split(' ')[0]}
       </p>

@@ -1353,16 +1353,20 @@ export function awardPoints(userId: number, activity: string, pts: number) {
   db.prepare('INSERT OR IGNORE INTO points (user_id, activity, pts) VALUES (?,?,?)').run(userId, activity, pts);
 }
 
-export interface LeaderboardRow { user_id: number; name: string; email: string; total: number; activities: string }
+export interface LeaderboardRow { user_id: number; name: string; email: string; total: number; activities: string; profile_photo_url: string | null }
 
 export function getLeaderboard(limit = 20): LeaderboardRow[] {
   return db.prepare(
-    `SELECT p.user_id, u.name, u.email,
+    `SELECT p.user_id, u.name, u.email, u.profile_photo_url,
             SUM(p.pts) AS total,
-            GROUP_CONCAT(p.activity, ',') AS activities  /* unique per user due to UNIQUE(user_id,activity) */
+            GROUP_CONCAT(p.activity, ',') AS activities
      FROM points p JOIN users u ON u.id=p.user_id
      GROUP BY p.user_id ORDER BY total DESC LIMIT ?`
   ).all(limit) as LeaderboardRow[];
+}
+
+export function updateRoom(id: number, room_number: string, notes: string | null) {
+  db.prepare('UPDATE rooms SET room_number=?, notes=? WHERE id=?').run(room_number, notes, id);
 }
 
 export function getUserPoints(userId: number): number {
