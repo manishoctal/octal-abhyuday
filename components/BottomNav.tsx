@@ -15,7 +15,7 @@ export default function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   const { data } = useSWR('/api/state', fetcher, { refreshInterval: 30000 });
   useRealtime(['/api/state']);
   usePushRegistration();
-  useWebPushSubscription();
+  useWebPushSubscription(isAdmin);
 
   const isLive = data?.state?.voting_state === 'live' || data?.state?.voting_state === 'paused';
 

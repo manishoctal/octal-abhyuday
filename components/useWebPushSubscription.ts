@@ -18,11 +18,30 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 /**
  * Subscribes the current browser to web push notifications via the VAPID key.
  * Runs once per session on authenticated pages. Native apps use usePushRegistration instead.
+ * Admins are excluded — they view the stage and should not receive employee notifications.
  */
-export function useWebPushSubscription() {
+export function useWebPushSubscription(isAdmin = false) {
   useEffect(() => {
-    if (_attempted || isNative()) return;
+    if (isNative()) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    // If admin: unsubscribe any existing web push subscription and remove from DB
+    if (isAdmin) {
+      (async () => {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) {
+            await sub.unsubscribe();
+            await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: 'web' }) });
+            console.log('[push/web] admin — unsubscribed from web push');
+          }
+        } catch { /* ignore */ }
+      })();
+      return;
+    }
+
+    if (_attempted) return;
     _attempted = true;
 
     (async () => {
