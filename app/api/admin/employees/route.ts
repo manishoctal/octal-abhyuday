@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import {
-  listEmployees, createEmployee, updateEmployee, deleteEmployee,
+  listEmployeesWithFaceStatus, createEmployee, updateEmployee, deleteEmployee,
   getEmployeeByCode, getEmployeeByEmail,
 } from '@/lib/db';
 
@@ -17,7 +17,7 @@ async function isFaceServiceUp(): Promise<boolean> {
 export async function GET() {
   const session = await getSession();
   if (!session?.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  return NextResponse.json({ employees: listEmployees() });
+  return NextResponse.json({ employees: listEmployeesWithFaceStatus() });
 }
 
 export async function POST(req: Request) {

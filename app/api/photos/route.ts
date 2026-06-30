@@ -89,7 +89,7 @@ export async function POST(req: Request) {
     results.push({ id, url });
     const photo = getPhotoById(id)!;
     generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
-    tagPhotoById(id, base).catch(() => {});
+    tagPhotoById(id, base).catch(() => setPhotoTagStatus(id, 'failed'));
   }
 
   return NextResponse.json({ uploaded: results.length, results });

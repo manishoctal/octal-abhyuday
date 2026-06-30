@@ -1267,6 +1267,15 @@ export function listEmployees(): Employee[] {
   return db.prepare('SELECT * FROM employees ORDER BY name ASC').all() as Employee[];
 }
 
+export function listEmployeesWithFaceStatus(): (Employee & { face_indexed: boolean })[] {
+  return (db.prepare(`
+    SELECT e.*, CASE WHEN fe.employee_id IS NOT NULL THEN 1 ELSE 0 END AS face_indexed
+    FROM employees e
+    LEFT JOIN face_embeddings fe ON fe.employee_id = e.id
+    ORDER BY e.name ASC
+  `).all() as (Employee & { face_indexed: number })[]).map(r => ({ ...r, face_indexed: r.face_indexed === 1 }));
+}
+
 export function getEmployeeById(id: number): Employee | undefined {
   return db.prepare('SELECT * FROM employees WHERE id = ?').get(id) as Employee | undefined;
 }

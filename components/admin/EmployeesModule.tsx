@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Search, Camera, X, Check, UserCheck, UserX } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Camera, X, Check, UserCheck, UserX, ScanFace } from 'lucide-react';
 import type { Employee } from '@/lib/db';
+
+type EmployeeWithFace = Employee & { face_indexed: boolean };
 
 /* ── XHR PUT for S3 presigned upload ── */
 function xhrPut(url: string, file: File, contentType: string, onProgress: (p: number) => void) {
@@ -177,9 +179,10 @@ function EmployeeForm({
   );
 }
 
-export default function EmployeesModule({ initial }: { initial: Employee[] }) {
-  const [employees, setEmployees] = useState<Employee[]>(initial);
+export default function EmployeesModule({ initial }: { initial: EmployeeWithFace[] }) {
+  const [employees, setEmployees] = useState<EmployeeWithFace[]>(initial);
   const [search, setSearch] = useState('');
+  const [faceFilter, setFaceFilter] = useState<'all' | 'missing'>('all');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -243,17 +246,36 @@ export default function EmployeesModule({ initial }: { initial: Employee[] }) {
     await refresh();
   }
 
-  const filtered = employees.filter(e =>
-    !search ||
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.employee_code.toLowerCase().includes(search.toLowerCase()) ||
-    e.email.toLowerCase().includes(search.toLowerCase()) ||
-    (e.department ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  const missingFaceCount = employees.filter(e => !e.face_indexed).length;
+  const filtered = employees.filter(e => {
+    if (faceFilter === 'missing' && e.face_indexed) return false;
+    if (!search) return true;
+    return (
+      e.name.toLowerCase().includes(search.toLowerCase()) ||
+      e.employee_code.toLowerCase().includes(search.toLowerCase()) ||
+      e.email.toLowerCase().includes(search.toLowerCase()) ||
+      (e.department ?? '').toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   return (
     <div className="space-y-5">
       {/* Header actions */}
+      {missingFaceCount > 0 && (
+        <button
+          onClick={() => setFaceFilter(f => f === 'missing' ? 'all' : 'missing')}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition border ${
+            faceFilter === 'missing'
+              ? 'bg-amber-50 border-amber-300 text-amber-700'
+              : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-600'
+          }`}
+        >
+          <ScanFace size={13} />
+          {faceFilter === 'missing'
+            ? `Showing ${missingFaceCount} without face index — click to show all`
+            : `${missingFaceCount} employee${missingFaceCount !== 1 ? 's' : ''} missing face index — click to filter`}
+        </button>
+      )}
       <div className="flex gap-2.5">
         <div className="flex-1 flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2.5 bg-white">
           <Search size={14} className="text-slate-400 shrink-0" />
@@ -353,6 +375,15 @@ export default function EmployeesModule({ initial }: { initial: Employee[] }) {
                     )}
                     {!emp.is_active && (
                       <span className="text-[10px] font-bold bg-red-50 text-red-500 px-2 py-0.5 rounded-full">inactive</span>
+                    )}
+                    {emp.face_indexed ? (
+                      <span className="text-[10px] font-bold bg-green-50 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <ScanFace size={10} />indexed
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <ScanFace size={10} />no face
+                      </span>
                     )}
                   </div>
                   <p className="text-xs text-slate-400 truncate">{emp.email}</p>
