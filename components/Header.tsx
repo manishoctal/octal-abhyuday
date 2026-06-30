@@ -49,11 +49,8 @@ export default function Header({
             </Link>
           ) : (
             <Link href="/" className="shrink-0 active:opacity-70 transition-opacity" aria-label="Home">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center shadow-sm"
-                style={{ background: 'linear-gradient(135deg,#FE9234 0%,#F97316 100%)' }}
-              >
-                <span className="text-white font-black text-[13px] leading-none">O</span>
+              <div className="w-8 h-8 rounded-xl overflow-hidden shadow-sm shrink-0">
+                <img src="/icons/icon-192.png" alt="Logo" className="w-full h-full object-cover" />
               </div>
             </Link>
           )}

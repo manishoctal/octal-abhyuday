@@ -86,23 +86,11 @@ function VenueItem({ item }: { item: EventInfoItem }) {
               {/* Action buttons */}
               <div className="flex gap-2">
                 <a
-                  href={item.maps_url!}
+                  href={`https://maps.google.com/maps?q=${encodeURIComponent(item.title)}&dirflg=d`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center justify-center gap-2 h-11 rounded-2xl text-sm font-semibold text-white active:scale-95 transition-transform"
                   style={{ background: '#FE9234' }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 1.5C5.5 1.5 3.5 3.5 3.5 6c0 3.5 4.5 8.5 4.5 8.5S12.5 9.5 12.5 6c0-2.5-2-4.5-4.5-4.5z" stroke="white" strokeWidth="1.3" fill="none"/>
-                    <circle cx="8" cy="6" r="1.5" fill="white"/>
-                  </svg>
-                  Get Directions
-                </a>
-                <a
-                  href={`https://maps.google.com/maps?q=${encodeURIComponent(item.title)}&dirflg=d`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 h-11 px-4 rounded-2xl text-sm font-semibold border border-slate-200 bg-white text-slate-700 active:scale-95 transition-transform"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M7 1v8M4 6l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

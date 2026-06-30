@@ -150,6 +150,16 @@ function fmtTime(iso: string) {
   return `${h12}:${m[2]} ${ampm}`;
 }
 
+function isToday(iso: string) {
+  const d = new Date(iso);
+  const t = new Date();
+  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 /* ── Today's Highlights (horizontal scroll strip) ───────────── */
 function TodaysHighlights({ sessions }: { sessions: ScheduleSession[] }) {
   const today = new Date();
@@ -208,10 +218,13 @@ function UpNext({ sessions }: { sessions: ScheduleSession[] }) {
   const diffMin   = Math.round((new Date(item.start_time).getTime() - now) / 60000);
 
   // Status text for the time row (no tag inside the card header)
+  const notToday = !isToday(item.start_time);
   const statusText = isOngoing
     ? 'Happening now'
     : diffMin > 0 && diffMin < 60
     ? `Starts in ${diffMin} min`
+    : notToday
+    ? `${fmtDate(item.start_time)}, ${fmtTime(item.start_time)}`
     : fmtTime(item.start_time);
 
   return (

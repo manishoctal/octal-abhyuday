@@ -9,11 +9,12 @@ interface Props {
   email: string;
   isCheckedIn: boolean;
   eventName: string;
+  photoUrl?: string | null;
 }
 
 type CheckInState = 'idle' | 'locating' | 'submitting' | 'success' | 'already' | 'error';
 
-export default function MyQrClient({ userId, name, email, isCheckedIn: initial, eventName }: Props) {
+export default function MyQrClient({ userId, name, email, isCheckedIn: initial, eventName, photoUrl }: Props) {
   const [state, setState]       = useState<CheckInState>(initial ? 'already' : 'idle');
   const [distanceM, setDist]    = useState<number | null>(null);
   const [errorMsg, setError]    = useState('');
@@ -142,10 +143,18 @@ export default function MyQrClient({ userId, name, email, isCheckedIn: initial, 
 
         {/* Avatar + identity */}
         <div className="flex flex-col items-center px-6 pt-7 pb-6 gap-4 bg-white">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-black shadow-md"
-            style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}>
-            {initials}
-          </div>
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt={name}
+              className="w-20 h-20 rounded-full object-cover shadow-md"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-black shadow-md"
+              style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}>
+              {initials}
+            </div>
+          )}
 
           <div className="text-center">
             <p className="font-bold text-slate-900 text-lg leading-tight">{name}</p>

@@ -70,11 +70,8 @@ function Sidebar({
       {/* Logo + close (mobile) */}
       <div className="flex items-center justify-between px-4 h-14 border-b border-slate-800 shrink-0">
         <Link href="/admin" className="flex items-center gap-2.5 min-w-0" onClick={onClose}>
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow"
-            style={{ background: 'linear-gradient(135deg,#FE9234,#F97316)' }}
-          >
-            <span className="text-white font-black text-[13px]">O</span>
+          <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 shadow">
+            <img src="/icons/icon-192.png" alt="Logo" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-bold text-orange-400 uppercase tracking-widest leading-none">Admin</p>
