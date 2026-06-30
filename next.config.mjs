@@ -5,6 +5,8 @@ const pwaConfig = withPWA({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
+  // Show /offline when the server is unreachable (deploy restart, 503, network down)
+  fallbacks: { document: '/offline' },
   runtimeCaching: [
     {
       urlPattern: /^https?.*/,

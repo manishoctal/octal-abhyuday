@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, Info, CloudUpload, AlertCircle, ScanFace, Loader2 } from 'lucide-react';
+import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, CloudUpload, AlertCircle, ScanFace, Loader2 } from 'lucide-react';
 import { useRealtime } from './useRealtime';
 import type { Photo } from '@/lib/db';
 
@@ -87,10 +87,21 @@ function StatusDot({ approved }: { approved: number }) {
 }
 
 /* ── lightbox ─────────────────────────────────────────────── */
-function Lightbox({ photos, index, onClose }: { photos: Photo[]; index: number; onClose: () => void }) {
+function Lightbox({
+  photos, index, onClose, userId, onDelete,
+}: {
+  photos: Photo[];
+  index: number;
+  onClose: () => void;
+  userId: number;
+  onDelete: (id: number) => void;
+}) {
   const [cur, setCur]           = useState(index);
-  const [showInfo, setShowInfo] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const p = photos[cur];
+
+  // Reset delete confirm when photo changes
+  useEffect(() => { setConfirmDelete(false); }, [cur]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -112,53 +123,120 @@ function Lightbox({ photos, index, onClose }: { photos: Photo[]; index: number; 
     touchX.current = null;
   }
 
+  const isOwn = p.uploader_id === userId;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col select-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 pt-4 pb-8"
-        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)' }}>
-        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm active:scale-90 transition-transform">
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col select-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+
+      {/* Top bar — fixed overlay */}
+      <div
+        className="shrink-0 flex items-center justify-between px-4 py-3"
+        style={{
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
+          paddingTop: 'max(16px, env(safe-area-inset-top))',
+        }}
+      >
+        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 active:scale-90 transition-transform">
           <X size={18} strokeWidth={2} color="white" />
         </button>
         <span className="text-white/70 text-sm font-medium">{cur + 1} / {photos.length}</span>
-        <button onClick={() => setShowInfo(v => !v)} className="w-9 h-9 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm active:scale-90 transition-transform">
-          <Info size={16} strokeWidth={2} color="white" />
-        </button>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-1">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img key={p.id} src={p.url} alt={p.caption ?? ''} className="max-h-full max-w-full object-contain" draggable={false} />
-      </div>
-
-      {cur > 0 && (
-        <button onClick={() => setCur(i => i - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm active:scale-90 transition-transform">
-          <ChevronLeft size={20} strokeWidth={2} color="white" />
-        </button>
-      )}
-      {cur < photos.length - 1 && (
-        <button onClick={() => setCur(i => i + 1)} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm active:scale-90 transition-transform">
-          <ChevronRight size={20} strokeWidth={2} color="white" />
-        </button>
-      )}
-
-      <div className="absolute bottom-0 inset-x-0 px-5 pt-10 pb-8 transition-all duration-300"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', opacity: showInfo ? 1 : 0, pointerEvents: showInfo ? 'auto' : 'none' }}>
-        <p className="text-white font-semibold text-[15px]">{p.uploader_name}</p>
-        {p.caption && <p className="text-white/70 text-sm mt-0.5">{p.caption}</p>}
-        {p.uploaded_at && (
-          <p className="text-white/40 text-xs mt-1">
-            {new Date(p.uploaded_at).toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+        {isOwn ? (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="w-10 h-10 flex items-center justify-center rounded-full active:scale-90 transition-transform"
+            style={{ background: 'rgba(239,68,68,0.45)', border: '1px solid rgba(239,68,68,0.6)' }}
+          >
+            <X size={16} strokeWidth={2.5} color="#fca5a5" />
+          </button>
+        ) : (
+          <div className="w-10 h-10" />
         )}
       </div>
 
-      {photos.length > 1 && (
-        <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1 pointer-events-none">
-          {photos.slice(Math.max(0, cur - 3), Math.min(photos.length, cur + 4)).map((_, i) => {
-            const actual = Math.max(0, cur - 3) + i;
-            return <span key={actual} className="rounded-full transition-all duration-200"
-              style={{ width: actual === cur ? 16 : 5, height: 5, background: actual === cur ? 'white' : 'rgba(255,255,255,0.4)' }} />;
-          })}
+      {/* Image area — takes all remaining space */}
+      <div className="flex-1 relative min-h-0">
+        <div className="absolute inset-0 flex items-center justify-center px-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img key={p.id} src={p.url} alt={p.caption ?? ''} className="max-h-full max-w-full object-contain" draggable={false} />
+        </div>
+
+        {/* Prev / next arrows */}
+        {cur > 0 && (
+          <button onClick={() => setCur(i => i - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 active:scale-90 transition-transform">
+            <ChevronLeft size={20} strokeWidth={2} color="white" />
+          </button>
+        )}
+        {cur < photos.length - 1 && (
+          <button onClick={() => setCur(i => i + 1)} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 active:scale-90 transition-transform">
+            <ChevronRight size={20} strokeWidth={2} color="white" />
+          </button>
+        )}
+
+        {/* Dot indicator — centred at bottom of image area */}
+        {photos.length > 1 && (
+          <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
+            {photos.slice(Math.max(0, cur - 3), Math.min(photos.length, cur + 4)).map((_, i) => {
+              const actual = Math.max(0, cur - 3) + i;
+              return <span key={actual} className="rounded-full transition-all duration-200"
+                style={{ width: actual === cur ? 16 : 5, height: 5, background: actual === cur ? 'white' : 'rgba(255,255,255,0.4)' }} />;
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom info bar — always visible, never hidden behind nav */}
+      <div
+        className="shrink-0 px-5 pt-4 pb-5 flex items-center justify-between gap-3"
+        style={{
+          background: 'rgba(0,0,0,0.85)',
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        <div className="min-w-0">
+          <p className="text-white font-semibold text-[15px] leading-snug">{p.uploader_name}</p>
+          {p.caption && <p className="text-white/60 text-sm mt-0.5 truncate">{p.caption}</p>}
+          {p.uploaded_at && (
+            <p className="text-white/35 text-xs mt-0.5">
+              {new Date(p.uploaded_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+              {' · '}
+              {new Date(p.uploaded_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          )}
+        </div>
+        {isOwn && (
+          <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+            style={{ background: 'rgba(254,146,52,0.2)', color: '#FE9234', border: '1px solid rgba(254,146,52,0.4)' }}>
+            Your photo
+          </span>
+        )}
+      </div>
+
+      {/* Delete confirm sheet */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full bg-white rounded-t-3xl p-6 space-y-4"
+            style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+                <X size={18} className="text-red-600" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900">Delete this photo?</p>
+                <p className="text-sm text-slate-500 mt-1">It will be permanently removed from the gallery.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-3 rounded-2xl font-bold text-sm border border-slate-200 text-slate-600">
+                Cancel
+              </button>
+              <button onClick={() => { setConfirmDelete(false); onDelete(p.id); onClose(); }}
+                className="flex-1 py-3 rounded-2xl font-bold text-sm text-white bg-red-500">
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -580,8 +658,9 @@ export default function GalleryClient({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={p.thumbnail_url ?? p.url} alt={p.caption ?? ''} className="w-full h-full object-cover" loading="lazy"
                       style={p.approved === -1 ? { filter: 'brightness(0.5) grayscale(0.5)' } : undefined} />
-                    {filter === 'mine' && <StatusDot approved={p.approved} />}
-                    {filter === 'mine' && (
+                    <StatusDot approved={p.approved} />
+                    {/* Delete button — visible for own photos in any filter */}
+                    {p.uploader_id === userId && (
                       <button
                         onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
                         disabled={deletingId === p.id}
@@ -608,7 +687,13 @@ export default function GalleryClient({
       </button>
 
       {lightboxPhotos && (
-        <Lightbox photos={lightboxPhotos} index={lightboxIndex} onClose={() => setLightboxPhotos(null)} />
+        <Lightbox
+          photos={lightboxPhotos}
+          index={lightboxIndex}
+          onClose={() => setLightboxPhotos(null)}
+          userId={userId}
+          onDelete={id => { setLightboxPhotos(null); deletePhoto(id); }}
+        />
       )}
 
       {showUpload && (

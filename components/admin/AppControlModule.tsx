@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import {
   Eye, EyeOff, Lock, Unlock, Trash2, Bell, BellOff, RefreshCw,
@@ -80,12 +80,13 @@ export default function AppControlModule() {
   const visibility = data?.moduleConfig.visibility ?? {} as Record<ModuleKey, boolean>;
   const enabled    = data?.moduleConfig.enabled    ?? {} as Record<ModuleKey, boolean>;
   const [localOrder, setLocalOrder] = useState<ModuleKey[]>([]);
-  // Sync from server on first load
-  const orderRef = useRef(false);
-  if (!orderRef.current && data?.moduleOrder?.length) {
-    orderRef.current = true;
-    setLocalOrder(data.moduleOrder as ModuleKey[]);
-  }
+  const orderSynced = useRef(false);
+  useEffect(() => {
+    if (!orderSynced.current && data?.moduleOrder?.length) {
+      orderSynced.current = true;
+      setLocalOrder(data.moduleOrder as ModuleKey[]);
+    }
+  }, [data?.moduleOrder]); // eslint-disable-line react-hooks/exhaustive-deps
   const order: ModuleKey[] = localOrder.length ? localOrder : (data?.moduleOrder as ModuleKey[] ?? MODULE_ORDER);
 
   async function saveConfig(newVis: Record<string, boolean>, newEna: Record<string, boolean>) {

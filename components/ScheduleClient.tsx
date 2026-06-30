@@ -94,7 +94,7 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
   }
 
   return (
-    <div className="space-y-8 pb-4" data-tick={tick}>
+    <div className="space-y-8 pb-4">
       {groups.map(([day, items]) => (
         <section key={day}>
           {/* Day label */}

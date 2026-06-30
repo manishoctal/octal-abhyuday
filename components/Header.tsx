@@ -95,7 +95,7 @@ export default function Header({
       </header>
 
       {showDialog && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-6 sm:pb-0">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center px-4 pb-[84px] sm:pb-0">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDialog(false)} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6 text-center">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#FEF2F2' }}>

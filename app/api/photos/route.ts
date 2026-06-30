@@ -3,6 +3,7 @@ import { requireUser, requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import { listPhotos, listUserPhotos, addPhoto, disablePhoto, enablePhoto, deletePhoto, getPhotoById } from '@/lib/db';
 import { deleteS3Object, isS3Configured } from '@/lib/s3';
 import { generateThumbnailAsync } from '@/lib/thumbnails';
+import { tagPhotoById } from '@/lib/face-tag';
 import fs from 'fs';
 import path from 'path';
 
@@ -57,13 +58,8 @@ export async function POST(req: Request) {
     }));
     for (const { id, url } of results) {
       const photo = getPhotoById(id)!;
-      // fire-and-forget: thumbnail + face tagging
       generateThumbnailAsync({ ...photo, url }, DATA_DIR()).catch(() => {});
-      fetch(`${base}/api/faces/tag-photo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photo_id: id }),
-      }).catch(() => {});
+      tagPhotoById(id, base).catch(() => {});
     }
     return NextResponse.json({ uploaded: results.length, results });
   }
@@ -93,11 +89,7 @@ export async function POST(req: Request) {
     results.push({ id, url });
     const photo = getPhotoById(id)!;
     generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
-    fetch(`${base}/api/faces/tag-photo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photo_id: id }),
-    }).catch(() => {});
+    tagPhotoById(id, base).catch(() => {});
   }
 
   return NextResponse.json({ uploaded: results.length, results });
