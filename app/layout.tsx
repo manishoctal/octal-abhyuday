@@ -31,7 +31,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {/* Web splash — shown on initial load, React hides it after hydration */}
         <div id="web-splash" aria-hidden="true">
-          <div className="splash-logo">O</div>
+          <div className="splash-logo"><img src="/icons/icon-192.png" width={72} height={72}
+     style={{ borderRadius: 22, display: 'block' }} alt="" /></div>
           <div className="splash-name">{eventName}</div>
           <div className="splash-by">Octal IT Solution LLP</div>
         </div>

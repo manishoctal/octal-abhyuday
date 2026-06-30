@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
-import { addPhotoPreApproved, getPhotoById } from '@/lib/db';
+import { addPhotoPreApproved, getPhotoById, setPhotoTagStatus } from '@/lib/db';
 import { generateThumbnailAsync } from '@/lib/thumbnails';
+import { tagPhotoById } from '@/lib/face-tag';
 import fs from 'fs';
 import path from 'path';
 
@@ -30,17 +31,22 @@ export async function POST(req: Request) {
       if (bad) return NextResponse.json({ error: 'Invalid photo URL' }, { status: 400 });
     }
 
+    const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
     const ids = urls.map(url =>
       addPhotoPreApproved(adminOrErr.id, adminOrErr.name, url, caption ?? null, null)
     );
 
-    // Generate thumbnails in background — don't block the response.
-    // Face tagging is intentionally skipped here: for bulk uploads the admin
-    // should click "Tag All Approved Photos" once done, rather than hammering
-    // the face service with N simultaneous requests.
     for (const id of ids) {
       const photo = getPhotoById(id);
       if (photo) generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
+      setTimeout(() => {
+        tagPhotoById(id, base)
+          .then(r => console.log(`[admin/photos/tag] photo ${id}: ${r.tagged} matched, ${r.faces} faces`))
+          .catch(err => {
+            console.error(`[admin/photos/tag] photo ${id} failed:`, err?.message ?? err);
+            setPhotoTagStatus(id, 'failed');
+          });
+      }, 3000);
     }
 
     return NextResponse.json({ uploaded: ids.length });
@@ -60,6 +66,8 @@ export async function POST(req: Request) {
   const uploadsDir = path.join(DATA_DIR(), 'uploads');
   fs.mkdirSync(uploadsDir, { recursive: true });
 
+  const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+
   for (const file of files) {
     const rawExt  = (file.name.split('.').pop() ?? 'jpg').toLowerCase();
     const ext     = JPEG_VARIANTS.has(rawExt) ? 'jpg' : rawExt;
@@ -69,6 +77,14 @@ export async function POST(req: Request) {
     const id  = addPhotoPreApproved(adminOrErr.id, adminOrErr.name, url, caption, null);
     const photo = getPhotoById(id);
     if (photo) generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
+    setTimeout(() => {
+      tagPhotoById(id, base)
+        .then(r => console.log(`[admin/photos/tag] photo ${id}: ${r.tagged} matched, ${r.faces} faces`))
+        .catch(err => {
+          console.error(`[admin/photos/tag] photo ${id} failed:`, err?.message ?? err);
+          setPhotoTagStatus(id, 'failed');
+        });
+    }, 3000);
   }
 
   return NextResponse.json({ uploaded: files.length });
