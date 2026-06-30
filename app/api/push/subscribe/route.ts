@@ -6,9 +6,16 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const userOrErr = await requireUser();
-  if (isErrorResponse(userOrErr)) return userOrErr;
+  if (isErrorResponse(userOrErr)) {
+    console.warn('[push/subscribe] POST — not authenticated (401)');
+    return userOrErr;
+  }
 
-  const { subscription, platform = 'web' } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { subscription, platform = 'web' } = body;
+
+  console.log(`[push/subscribe] POST — user=${userOrErr.id} (${userOrErr.email}) platform=${platform} hasToken=${!!subscription}`);
+
   if (!subscription) return NextResponse.json({ error: 'subscription required' }, { status: 400 });
 
   savePushSubscription(
@@ -16,6 +23,8 @@ export async function POST(req: Request) {
     platform as 'web',
     typeof subscription === 'string' ? subscription : JSON.stringify(subscription)
   );
+
+  console.log(`[push/subscribe] saved — user=${userOrErr.id} platform=${platform}`);
   return NextResponse.json({ ok: true });
 }
 
