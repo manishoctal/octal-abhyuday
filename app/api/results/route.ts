@@ -9,7 +9,7 @@ export async function GET() {
   if (isErrorResponse(session)) return session;
 
   const state = getAppState();
-  if (!state.results_announced && !session.isAdmin) {
+  if (!state.results_announced && session.isAdmin) {
     return NextResponse.json(
       { error: 'Results not announced yet', voting_state: state.voting_state },
       { status: 403 }

@@ -58,6 +58,18 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
     refreshInterval: 15000,
   });
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  async function syncPhotos() {
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/admin/candidates/sync-photos', { method: 'POST' });
+      const body = await res.json();
+      notify(res.ok ? `Photos synced — ${body.updated} candidates updated ✅` : (body.error ?? 'Sync failed'));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function doAction(action: string, confirmMsg?: string) {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
@@ -151,6 +163,15 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
             'Reset voting to "not started"? (Votes are kept; results flag is cleared.)'
           )}
         </div>
+
+        {/* Sync candidate photos from employee roster */}
+        <button
+          onClick={syncPhotos}
+          disabled={syncing}
+          className="w-full rounded-xl border border-slate-200 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {syncing ? '⏳ Syncing…' : '🖼️ Sync Photos from Employee Roster'}
+        </button>
 
         {/* Announce (final round only) */}
         {isFinalRound && (

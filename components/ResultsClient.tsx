@@ -81,7 +81,7 @@ export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
       <div className="relative z-10 max-w-3xl mx-auto px-4 pb-24">
         {previewOnly && (
           <div className="mt-4 rounded-2xl bg-amber-400/10 border border-amber-400/40 px-4 py-3 text-amber-300 text-sm font-semibold">
-            👁️ Admin preview — employees can&apos;t see this until you announce results.
+            👁️ Preview — results will be officially announced soon. Stay tuned!
           </div>
         )}
 

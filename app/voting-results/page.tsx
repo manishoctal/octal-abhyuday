@@ -14,7 +14,7 @@ export default async function ResultsPage() {
   return (
     <>
       <Header eventName={getAppState().event_name} title="Results" isAdmin={session.isAdmin} />
-      <ResultsClient isAdmin={session.isAdmin} />
+      <ResultsClient isAdmin={!session.isAdmin} />
       <BottomNav isAdmin={session.isAdmin} />
     </>
   );

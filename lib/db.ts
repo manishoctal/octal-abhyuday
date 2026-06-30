@@ -211,8 +211,21 @@ export function listCandidates(gender: Gender | undefined, opts: ListOptions): C
   const order = opts.orderByName ? 'c.name ASC' : 'vote_count DESC, MIN(v.updated_at) ASC, c.name ASC';
   return db
     .prepare(
-      `SELECT c.*, COUNT(v.id) AS vote_count, MIN(v.updated_at) AS first_vote_at
+      `SELECT c.id, c.name, c.gender, c.email, c.employee_code, c.is_finalist,
+              COALESCE(
+                NULLIF(e.profile_photo_url, ''),
+                NULLIF(u.profile_photo_url, ''),
+                c.image_url
+              ) AS image_url,
+              COUNT(v.id) AS vote_count, MIN(v.updated_at) AS first_vote_at
        FROM candidates c
+       LEFT JOIN employees e ON (
+         (c.email        IS NOT NULL AND lower(e.email)         = lower(c.email))        OR
+         (c.employee_code IS NOT NULL AND e.employee_code        = c.employee_code)
+       )
+       LEFT JOIN users u ON (
+         (c.email IS NOT NULL AND lower(u.email) = lower(c.email))
+       )
        LEFT JOIN votes v ON v.candidate_id = c.id AND v.round = ?
        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
        GROUP BY c.id
@@ -279,6 +292,34 @@ export function upsertCandidateByEmail(
   }
   createCandidate(name, gender, imageUrl, email.toLowerCase());
   return { action: 'added' };
+}
+
+/** Bulk-sync candidate image_url from employees/users tables.
+ *  Matches by email first, then by employee_code. Returns number of rows updated. */
+export function syncAllCandidatePhotos(): number {
+  const result = db.prepare(`
+    UPDATE candidates SET image_url = (
+      SELECT COALESCE(NULLIF(e.profile_photo_url,''), NULLIF(u.profile_photo_url,''))
+      FROM employees e
+      LEFT JOIN users u ON lower(u.email) = lower(e.email)
+      WHERE (
+        (candidates.email         IS NOT NULL AND lower(e.email)          = lower(candidates.email)) OR
+        (candidates.employee_code IS NOT NULL AND e.employee_code          = candidates.employee_code)
+      )
+      AND COALESCE(NULLIF(e.profile_photo_url,''), NULLIF(u.profile_photo_url,'')) IS NOT NULL
+      LIMIT 1
+    )
+    WHERE EXISTS (
+      SELECT 1 FROM employees e
+      LEFT JOIN users u ON lower(u.email) = lower(e.email)
+      WHERE (
+        (candidates.email         IS NOT NULL AND lower(e.email)          = lower(candidates.email)) OR
+        (candidates.employee_code IS NOT NULL AND e.employee_code          = candidates.employee_code)
+      )
+      AND COALESCE(NULLIF(e.profile_photo_url,''), NULLIF(u.profile_photo_url,'')) IS NOT NULL
+    )
+  `).run();
+  return result.changes;
 }
 
 /** Auto-import: every signing-in employee becomes a candidate (deduped by email).
