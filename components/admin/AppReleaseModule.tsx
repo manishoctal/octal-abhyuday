@@ -26,38 +26,43 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
       setForm(f => ({ ...f, [k]: e.target.value }));
 
   async function handleApkFile(file: File) {
-    setErr(''); setUploading(true); setUploadPct(0);
+    setErr(''); setUploading(true); setUploadPct(0); setSaved(false);
     try {
-      // 1. Get presigned upload URL
-      const presignRes = await fetch('/api/admin/apk-presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name }),
-      });
-      if (!presignRes.ok) {
-        const { error } = (await presignRes.json()) as { error?: string };
-        throw new Error(error ?? 'Could not get upload URL');
-      }
-      const { presignedUrl, publicUrl } = (await presignRes.json()) as {
-        presignedUrl: string;
-        publicUrl: string;
-      };
+      const fd = new FormData();
+      fd.append('file', file);
 
-      // 2. Upload directly to S3 using XHR so we get progress
-      await new Promise<void>((resolve, reject) => {
+      // Upload to server disk via XHR for progress tracking
+      const { publicUrl } = await new Promise<{ publicUrl: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('PUT', presignedUrl);
-        xhr.setRequestHeader('Content-Type', 'application/vnd.android.package-archive');
+        xhr.open('POST', '/api/admin/apk-upload');
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100));
         };
-        xhr.onload  = () => (xhr.status === 200 ? resolve() : reject(new Error(`S3 error ${xhr.status}`)));
-        xhr.onerror = () => reject(new Error('Upload failed'));
-        xhr.send(file);
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            resolve(JSON.parse(xhr.responseText) as { publicUrl: string });
+          } else {
+            let msg = `Upload failed (${xhr.status})`;
+            try { msg = (JSON.parse(xhr.responseText) as { error?: string }).error ?? msg; } catch { /* ignore */ }
+            reject(new Error(msg));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(fd);
       });
 
-      setForm(f => ({ ...f, downloadUrl: publicUrl }));
+      // Auto-save the new URL to DB immediately so /install always serves fresh
+      const newForm = { ...form, downloadUrl: publicUrl };
+      const saveRes = await fetch('/api/admin/app-release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newForm),
+      });
+      if (!saveRes.ok) throw new Error('File uploaded but failed to save URL — click Save Release manually');
+
+      setForm(newForm);
       setUploadedName(file.name);
+      setSaved(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Upload failed');
     } finally {
@@ -99,7 +104,6 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
             APK File
           </span>
 
-          {/* Hidden file input */}
           <input
             ref={fileRef}
             type="file"
@@ -112,7 +116,6 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
             }}
           />
 
-          {/* Upload button */}
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -122,7 +125,6 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
             {uploading ? `Uploading… ${uploadPct}%` : '⬆ Upload APK'}
           </button>
 
-          {/* Progress bar */}
           {uploading && (
             <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
               <div
@@ -132,7 +134,6 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
             </div>
           )}
 
-          {/* Current URL (read-only after upload, or existing saved URL) */}
           {form.downloadUrl && (
             <div className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
               <span className="text-green-600 text-sm mt-0.5">✓</span>
@@ -152,6 +153,10 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
               </a>
             </div>
           )}
+
+          <p className="text-[11px] text-slate-400">
+            Stored on server disk · served with no-cache headers · no CDN involvement
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -216,7 +221,7 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
         </label>
 
         {err   && <p className="text-sm text-red-600 font-medium">{err}</p>}
-        {saved && <p className="text-sm text-green-600 font-medium">✓ Saved</p>}
+        {saved && <p className="text-sm text-green-600 font-medium">✓ Saved — /install now serves the latest APK</p>}
 
         <button
           onClick={save}
@@ -246,9 +251,14 @@ export default function AppReleaseModule({ initial }: { readonly initial: Releas
             Open ↗
           </a>
         </div>
-        <p className="text-xs text-slate-400">
-          The install page shows a QR code of the APK URL and a download button.
-        </p>
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 space-y-1">
+          <p className="font-bold">⚠ One-time server setup required</p>
+          <p>Add this to your nginx config so large APKs upload correctly:</p>
+          <code className="block bg-amber-100 rounded px-2 py-1 font-mono mt-1">
+            client_max_body_size 150M;
+          </code>
+          <p className="text-amber-600 mt-1">Then: <code className="font-mono">sudo nginx -s reload</code></p>
+        </div>
       </div>
     </div>
   );

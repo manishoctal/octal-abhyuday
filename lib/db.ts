@@ -404,10 +404,20 @@ db.exec(`
 
 // ---------- user profile ----------
 
+/** Keep candidates.image_url in sync whenever a profile photo is saved. */
+function syncCandidatePhoto(email: string | null | undefined, photoUrl: string | null) {
+  if (!email || !photoUrl) return;
+  db.prepare('UPDATE candidates SET image_url = ? WHERE email = ?').run(photoUrl, email.toLowerCase());
+}
+
 export function updateUserProfile(userId: number, department: string | null, profilePhotoUrl: string | null) {
   db.prepare('UPDATE users SET department = ?, profile_photo_url = ? WHERE id = ?').run(
     department, profilePhotoUrl, userId
   );
+  if (profilePhotoUrl) {
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
+    syncCandidatePhoto(user?.email, profilePhotoUrl);
+  }
 }
 
 export function getUserById(id: number) {
