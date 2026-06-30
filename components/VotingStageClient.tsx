@@ -25,6 +25,70 @@ const SPARKLES = [
   { top: '20%', left: '55%', delay: '1.2s' },
 ];
 
+function WinnersDisplay({ male, female }: { male?: CandidateWithVotes; female?: CandidateWithVotes }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+      className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-10 sm:gap-20 py-6"
+    >
+      {male   && <BigWinnerCard candidate={male}   label="Most Popular Male"   emoji="🤵" delay={0}   />}
+      {female && <BigWinnerCard candidate={female} label="Most Popular Female" emoji="👸" delay={0.35} />}
+    </motion.div>
+  );
+}
+
+function BigWinnerCard({ candidate, label, emoji, delay }: {
+  candidate: CandidateWithVotes; label: string; emoji: string; delay: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, type: 'spring', stiffness: 110, damping: 16 }}
+      className="flex flex-col items-center text-center"
+    >
+      <p className="text-sm sm:text-base font-bold uppercase tracking-widest text-amber-300 mb-6">
+        {emoji} {label}
+      </p>
+
+      {/* Photo with pulsing gold ring */}
+      <motion.div
+        animate={{ y: [0, -10, 0] }}
+        transition={{ repeat: Infinity, duration: 3.5, ease: 'easeInOut' }}
+        className="relative mb-6"
+      >
+        <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-5xl drop-shadow-lg">👑</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={candidate.image_url}
+          alt={candidate.name}
+          className="w-44 h-44 sm:w-56 sm:h-56 rounded-full object-cover border-4 border-amber-400"
+          style={{ boxShadow: '0 0 50px rgba(251,191,36,0.55), 0 0 120px rgba(251,191,36,0.20)' }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src =
+              `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(candidate.name)}`;
+          }}
+        />
+        {/* Pulsing outer ring */}
+        <motion.div
+          animate={{ scale: [1, 1.08, 1], opacity: [0.6, 0.2, 0.6] }}
+          transition={{ repeat: Infinity, duration: 2.5 }}
+          className="absolute inset-0 rounded-full border-2 border-amber-400 pointer-events-none"
+        />
+      </motion.div>
+
+      <h2 className="text-3xl sm:text-5xl font-black gold-text leading-tight mb-2">
+        {candidate.name}
+      </h2>
+      <p className="text-base sm:text-lg font-semibold text-slate-400">
+        {candidate.vote_count} vote{candidate.vote_count === 1 ? '' : 's'}
+      </p>
+    </motion.div>
+  );
+}
+
 function VotingStateLabel({ state }: { state: string }) {
   if (state === 'live')
     return (
@@ -171,27 +235,34 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
 
   const COLORS = ['#FE9234', '#FFD700', '#FF6B6B', '#4ECDC4', '#A78BFA', '#FFFFFF'];
 
-  // Drumroll → reveal phase when results are announced
-  const [announcePhase, setAnnouncePhase] = useState<'idle' | 'drumroll' | 'reveal'>('idle');
-  const prevResultsAnnounced = useRef(false);
+  // Drumroll → reveal → winners phase when results are announced
+  const [announcePhase, setAnnouncePhase] = useState<'idle' | 'drumroll' | 'reveal' | 'winners'>('idle');
+  const prevResultsAnnounced = useRef<boolean | null>(null); // null = data not yet loaded
   useEffect(() => {
+    if (!data) return; // wait for first data load
+    if (prevResultsAnnounced.current === null) {
+      // First load — if already announced, skip straight to winners
+      prevResultsAnnounced.current = resultsAnnounced;
+      if (resultsAnnounced) setAnnouncePhase('winners');
+      return;
+    }
     if (resultsAnnounced && !prevResultsAnnounced.current) {
+      // Transition: not announced → announced — play full drumroll sequence
+      prevResultsAnnounced.current = true;
       setAnnouncePhase('drumroll');
       const t = setTimeout(() => {
         setAnnouncePhase('reveal');
-        // Big confetti burst on reveal
         confetti({ particleCount: 300, spread: 100, origin: { y: 0.5 }, colors: COLORS, zIndex: 200 });
         setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 60,  origin: { x: 0,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 400);
         setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 120, origin: { x: 1,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 800);
         setTimeout(() => confetti({ particleCount: 180, spread: 360, startVelocity: 35,
           origin: { x: 0.5, y: 0.4 }, colors: ['#fbbf24','#fde68a','#f59e0b','#fff'], zIndex: 200 }), 1200);
-        // Fade out reveal overlay after 4s — stage goes back to leaderboard view with sparkles
-        setTimeout(() => setAnnouncePhase('idle'), 4000);
+        setTimeout(() => setAnnouncePhase('winners'), 4000);
       }, 2600);
       return () => clearTimeout(t);
     }
     prevResultsAnnounced.current = resultsAnnounced;
-  }, [resultsAnnounced]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resultsAnnounced, data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (winnerCount > prevWinnerCount.current && winnerCount > 0) {
@@ -345,14 +416,18 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
           )}
         </div>
 
-        {/* Columns */}
-        <div className="flex-1 flex flex-col sm:flex-row gap-8 sm:gap-10">
-          <GenderColumn title="Mr. ABHYUDAY" emoji="👨" candidates={topMale}   color="#60A5FA" />
-          {/* Mobile: horizontal rule; Desktop: vertical rule */}
-          <div className="sm:hidden h-px w-full rounded-full" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent)' }} />
-          <div className="hidden sm:block w-px self-stretch rounded-full" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.3) 20%, rgba(255,255,255,0.3) 80%, transparent)' }} />
-          <GenderColumn title="Ms. ABHYUDAY" emoji="👩" candidates={topFemale} color="#F472B6" />
-        </div>
+        {/* Columns or Winner Cards */}
+        {announcePhase === 'winners' ? (
+          <WinnersDisplay male={topMale[0]} female={topFemale[0]} />
+        ) : (
+          <div className="flex-1 flex flex-col sm:flex-row gap-8 sm:gap-10">
+            <GenderColumn title="Mr. ABHYUDAY" emoji="👨" candidates={topMale}   color="#60A5FA" />
+            {/* Mobile: horizontal rule; Desktop: vertical rule */}
+            <div className="sm:hidden h-px w-full rounded-full" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent)' }} />
+            <div className="hidden sm:block w-px self-stretch rounded-full" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.3) 20%, rgba(255,255,255,0.3) 80%, transparent)' }} />
+            <GenderColumn title="Ms. ABHYUDAY" emoji="👩" candidates={topFemale} color="#F472B6" />
+          </div>
+        )}
 
         <p className="text-center text-xs text-slate-600 mt-6">
           Vote on your phone · sign in at the event app 📱

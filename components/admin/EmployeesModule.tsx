@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Search, Camera, X, Check, UserCheck, UserX, ScanFace } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Camera, X, Check, UserCheck, UserX, ScanFace, Vote } from 'lucide-react';
 import type { Employee } from '@/lib/db';
 
 type EmployeeWithFace = Employee & { face_indexed: boolean };
@@ -40,11 +40,12 @@ interface FormState {
   gender: 'male' | 'female' | '';
   profile_photo_url: string;
   is_active: boolean;
+  exclude_from_voting: boolean;
 }
 
 const EMPTY: FormState = {
   employee_code: '', name: '', email: '', department: '',
-  gender: '', profile_photo_url: '', is_active: true,
+  gender: '', profile_photo_url: '', is_active: true, exclude_from_voting: false,
 };
 
 function EmployeeForm({
@@ -154,13 +155,22 @@ function EmployeeForm({
           placeholder="Engineering" />
       </div>
 
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex flex-col gap-2 pt-1">
         <label className="flex items-center gap-2 cursor-pointer">
           <div onClick={() => set('is_active', !form.is_active)}
             className={`w-10 h-6 rounded-full transition-colors relative ${form.is_active ? 'bg-green-500' : 'bg-slate-300'}`}>
             <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.is_active ? 'left-5' : 'left-1'}`} />
           </div>
           <span className="text-sm font-medium text-slate-700">Active (can log in)</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <div onClick={() => set('exclude_from_voting', !form.exclude_from_voting)}
+            className={`w-10 h-6 rounded-full transition-colors relative ${form.exclude_from_voting ? 'bg-red-400' : 'bg-green-500'}`}>
+            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.exclude_from_voting ? 'left-5' : 'left-1'}`} />
+          </div>
+          <span className="text-sm font-medium text-slate-700">
+            {form.exclude_from_voting ? 'Excluded from popularity voting' : 'Included in popularity voting'}
+          </span>
         </label>
       </div>
 
@@ -242,6 +252,18 @@ export default function EmployeesModule({ initial }: { initial: EmployeeWithFace
       employee_code: emp.employee_code, name: emp.name, email: emp.email,
       department: emp.department, gender: emp.gender,
       profile_photo_url: emp.profile_photo_url, is_active: emp.is_active ? 0 : 1,
+      exclude_from_voting: emp.exclude_from_voting,
+    });
+    await refresh();
+  }
+
+  async function toggleVoting(emp: Employee) {
+    await api({
+      action: 'update', id: emp.id,
+      employee_code: emp.employee_code, name: emp.name, email: emp.email,
+      department: emp.department, gender: emp.gender,
+      profile_photo_url: emp.profile_photo_url, is_active: emp.is_active,
+      exclude_from_voting: emp.exclude_from_voting ? 0 : 1,
     });
     await refresh();
   }
@@ -352,6 +374,7 @@ export default function EmployeesModule({ initial }: { initial: EmployeeWithFace
                     gender: (emp.gender as 'male' | 'female' | '') ?? '',
                     profile_photo_url: emp.profile_photo_url ?? '',
                     is_active: !!emp.is_active,
+                    exclude_from_voting: !!emp.exclude_from_voting,
                   }}
                   onSave={form => handleUpdate(emp.id, form)}
                   onCancel={() => { setEditing(null); setError(''); }}
@@ -376,6 +399,11 @@ export default function EmployeesModule({ initial }: { initial: EmployeeWithFace
                     {!emp.is_active && (
                       <span className="text-[10px] font-bold bg-red-50 text-red-500 px-2 py-0.5 rounded-full">inactive</span>
                     )}
+                    {!!emp.exclude_from_voting && (
+                      <span className="text-[10px] font-bold bg-purple-50 text-purple-500 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <Vote size={10} />no vote
+                      </span>
+                    )}
                     {emp.face_indexed ? (
                       <span className="text-[10px] font-bold bg-green-50 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-0.5">
                         <ScanFace size={10} />indexed
@@ -390,6 +418,11 @@ export default function EmployeesModule({ initial }: { initial: EmployeeWithFace
                   {emp.department && <p className="text-xs text-slate-400 truncate">{emp.department}</p>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => toggleVoting(emp)}
+                    title={emp.exclude_from_voting ? 'Include in voting' : 'Exclude from voting'}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-purple-50">
+                    <Vote size={15} className={emp.exclude_from_voting ? 'text-purple-400' : 'text-slate-300'} />
+                  </button>
                   <button onClick={() => toggleActive(emp)}
                     title={emp.is_active ? 'Deactivate' : 'Activate'}
                     className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-slate-50">

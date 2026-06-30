@@ -227,7 +227,8 @@ export function listCandidates(gender: Gender | undefined, opts: ListOptions): C
          (c.email IS NOT NULL AND lower(u.email) = lower(c.email))
        )
        LEFT JOIN votes v ON v.candidate_id = c.id AND v.round = ?
-       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+       WHERE (e.exclude_from_voting IS NULL OR e.exclude_from_voting = 0)
+       ${where.length ? 'AND ' + where.join(' AND ') : ''}
        GROUP BY c.id
        ORDER BY ${order}`
     )
@@ -1249,7 +1250,13 @@ db.exec(`
   );
 `);
 
-// Inline migrations: add employee_code to users + candidates
+// Inline migrations
+const empCols = (db.prepare('PRAGMA table_info(employees)').all() as { name: string }[]).map(c => c.name);
+if (!empCols.includes('exclude_from_voting')) {
+  db.exec('ALTER TABLE employees ADD COLUMN exclude_from_voting INTEGER NOT NULL DEFAULT 0');
+}
+
+// add employee_code to users + candidates
 const userColsV2 = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
 if (!userColsV2.includes('employee_code')) {
   db.exec('ALTER TABLE users ADD COLUMN employee_code TEXT');
@@ -1311,6 +1318,7 @@ export interface Employee {
   gender: 'male' | 'female' | null;
   profile_photo_url: string | null;
   is_active: number;
+  exclude_from_voting: number;
   created_at: string;
 }
 
@@ -1355,11 +1363,11 @@ export function createEmployee(
 export function updateEmployee(
   id: number, employeeCode: string, name: string, email: string,
   department: string | null, gender: 'male' | 'female' | null,
-  profilePhotoUrl: string | null, isActive: number
+  profilePhotoUrl: string | null, isActive: number, excludeFromVoting = 0
 ) {
   db.prepare(
-    `UPDATE employees SET employee_code=?, name=?, email=?, department=?, gender=?, profile_photo_url=?, is_active=? WHERE id=?`
-  ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl, isActive, id);
+    `UPDATE employees SET employee_code=?, name=?, email=?, department=?, gender=?, profile_photo_url=?, is_active=?, exclude_from_voting=? WHERE id=?`
+  ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl, isActive, excludeFromVoting, id);
   syncCandidatePhoto(email, profilePhotoUrl);
 }
 

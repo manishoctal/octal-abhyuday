@@ -11,11 +11,19 @@ import type {
   QaQuestionType,
   QaResults,
   QaSessionKind,
+  CandidateWithVotes,
+  AppState,
 } from '@/lib/types';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const kindEmoji: Record<QaSessionKind, string> = { qna: '💬', poll: '📊', ranking: '🏅' };
+
+interface ResultsResponse {
+  male: CandidateWithVotes[];
+  female: CandidateWithVotes[];
+  state: AppState;
+}
 
 interface OverviewResponse {
   eventName: string;
@@ -43,10 +51,14 @@ const SPARKLES = [
 ];
 
 export default function StageClient() {
-  useRealtime(['/api/admin/qa/overview']);
+  useRealtime(['/api/admin/qa/overview', '/api/results']);
   const { data } = useSWR<OverviewResponse>('/api/admin/qa/overview', fetcher, {
     refreshInterval: 15000,
   });
+  const { data: resultsData } = useSWR<ResultsResponse>('/api/results', fetcher, {
+    refreshInterval: 15000,
+  });
+  const resultsAnnounced = resultsData?.state?.results_announced ?? false;
 
   // Confetti burst on reveal
   const lastReveal = useRef<string>('');
@@ -91,13 +103,17 @@ export default function StageClient() {
               <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-amber-400 animate-spin" />
             </div>
           ) : !data.session ? (
-            <Idle emoji="🎤" text="Waiting for the show to begin…" />
+            resultsAnnounced && resultsData
+              ? <VotingWinners resultsData={resultsData} />
+              : <Idle emoji="🎤" text="Waiting for the show to begin…" />
           ) : data.session.status === 'ended' ? (
             <div className="space-y-12">
               {data.question && <StageQuestion data={data} />}
               {data.leaderboard.length > 0 && <StageLeaderboard rows={data.leaderboard} />}
               {!data.question && data.leaderboard.length === 0 && (
-                <Idle emoji="👏" text="That's a wrap — thanks for playing!" />
+                resultsAnnounced && resultsData
+                  ? <VotingWinners resultsData={resultsData} />
+                  : <Idle emoji="👏" text="That's a wrap — thanks for playing!" />
               )}
             </div>
           ) : !data.question ? (
@@ -106,6 +122,13 @@ export default function StageClient() {
             <StageQuestion data={data} />
           )}
         </div>
+
+        {/* Voting winners strip — shown alongside an active Q&A session when results are announced */}
+        {resultsAnnounced && resultsData && data?.session && data.session.status !== 'ended' && (
+          <div className="pb-8">
+            <VotingWinners resultsData={resultsData} compact />
+          </div>
+        )}
 
         <p className="text-center text-xs text-slate-500">
           Answer on your phone — sign in at the voting site 📱
@@ -300,6 +323,165 @@ function StageRank({ options, results }: { options: string[]; results: QaResults
         </motion.div>
       ))}
     </motion.div>
+  );
+}
+
+/* ── Voting Winners ─────────────────────────────────────────── */
+function VotingWinners({ resultsData, compact = false }: { resultsData: ResultsResponse; compact?: boolean }) {
+  const male   = resultsData.male[0];
+  const female = resultsData.female[0];
+  if (!male && !female) return null;
+
+  if (compact) {
+    return (
+      <div className="border-t border-white/10 pt-6">
+        <p className="text-center text-xs font-bold uppercase tracking-[0.25em] text-amber-300/70 mb-4">
+          🏆 Most Popular — Winners
+        </p>
+        <div className="flex justify-center gap-8">
+          {male   && <CompactWinner candidate={male}   label="Most Popular Male"   emoji="🤵" />}
+          {female && <CompactWinner candidate={female} label="Most Popular Female" emoji="👸" />}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div key="voting-winners" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
+      <div className="text-center mb-10">
+        <p className="text-sm font-bold uppercase tracking-[0.25em] text-amber-300/80">
+          Octal IT Solution LLP presents
+        </p>
+        <h2 className="text-4xl sm:text-5xl font-black gold-text leading-tight mt-1">
+          {resultsData.state.event_name}
+        </h2>
+        <p className="text-base font-semibold text-slate-400 mt-1">Most Popular — Winners</p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto mb-12">
+        {male   && <VotingWinnerCard candidate={male}   label="Most Popular Male"   emoji="🤵" delay={0}   />}
+        {female && <VotingWinnerCard candidate={female} label="Most Popular Female" emoji="👸" delay={0.3} />}
+      </div>
+
+      <VotingRankedList title="🤵 Male leaderboard"   candidates={resultsData.male}   />
+      <VotingRankedList title="👸 Female leaderboard" candidates={resultsData.female} />
+    </motion.div>
+  );
+}
+
+function VotingWinnerCard({ candidate, label, emoji, delay }: {
+  candidate: CandidateWithVotes; label: string; emoji: string; delay: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60, rotateY: 90 }}
+      animate={{ opacity: 1, y: 0, rotateY: 0 }}
+      transition={{ delay, type: 'spring', stiffness: 120, damping: 16 }}
+      className="gold-border rounded-3xl"
+    >
+      <div className="bg-slate-900 rounded-3xl p-6 text-center relative overflow-hidden">
+        <div className="text-sm font-bold uppercase tracking-widest text-amber-300">
+          {emoji} {label}
+        </div>
+        <motion.div
+          animate={{ y: [0, -6, 0] }}
+          transition={{ repeat: Infinity, duration: 3 }}
+          className="relative inline-block mt-4"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={candidate.image_url}
+            alt={candidate.name}
+            className="w-28 h-28 rounded-full object-cover mx-auto border-4 border-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.5)]"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src =
+                `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(candidate.name)}`;
+            }}
+          />
+          <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-3xl drop-shadow">👑</span>
+        </motion.div>
+        <h3 className="mt-4 text-2xl font-black gold-text">{candidate.name}</h3>
+        <p className="text-slate-400 text-sm font-semibold mt-1">
+          {candidate.vote_count} vote{candidate.vote_count === 1 ? '' : 's'}
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+function CompactWinner({ candidate, label, emoji }: {
+  candidate: CandidateWithVotes; label: string; emoji: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 text-center">
+      <div className="relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={candidate.image_url}
+          alt={candidate.name}
+          className="w-16 h-16 rounded-full object-cover border-2 border-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.4)]"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src =
+              `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(candidate.name)}`;
+          }}
+        />
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xl">👑</span>
+      </div>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-amber-300">{emoji} {label}</p>
+        <p className="font-black text-white text-sm">{candidate.name}</p>
+      </div>
+    </div>
+  );
+}
+
+function VotingRankedList({ title, candidates }: { title: string; candidates: CandidateWithVotes[] }) {
+  const maxVotes = Math.max(1, ...candidates.map(c => c.vote_count));
+  const medal = (i: number) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`);
+  return (
+    <div className="mb-10 max-w-3xl mx-auto">
+      <h2 className="text-lg font-extrabold text-white mb-3">{title}</h2>
+      <div className="space-y-2">
+        {candidates.map((c, i) => (
+          <motion.div
+            key={c.id}
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6 + i * 0.08 }}
+            className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
+              i === 0 ? 'bg-amber-400/10 border border-amber-400/40'
+              : i === 1 ? 'bg-slate-300/10 border border-slate-400/30'
+              : i === 2 ? 'bg-orange-400/10 border border-orange-400/30'
+              : 'bg-white/5 border border-white/10'
+            }`}
+          >
+            <span className="w-8 text-center text-lg font-bold text-slate-300">{medal(i)}</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={c.image_url}
+              alt={c.name}
+              className="w-10 h-10 rounded-full object-cover bg-slate-800"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(c.name)}`;
+              }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-white truncate">{c.name}</p>
+              <div className="mt-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(c.vote_count / maxVotes) * 100}%` }}
+                  transition={{ delay: 0.8 + i * 0.08, duration: 0.6 }}
+                  className={`h-full rounded-full ${i === 0 ? 'bg-amber-400' : 'bg-slate-400'}`}
+                />
+              </div>
+            </div>
+            <span className="text-sm font-bold text-slate-300">{c.vote_count}</span>
+          </motion.div>
+        ))}
+      </div>
+    </div>
   );
 }
 

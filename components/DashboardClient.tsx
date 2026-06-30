@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import {
   ChevronRight, MapPin, Clock, QrCode, CalendarDays, Trophy,
   Vote, ImageIcon, MessageSquare, BarChart3, Star, Mic,
-  UtensilsCrossed, Coffee, Target, Award, Zap,
+  UtensilsCrossed, Coffee, Target, Award, Zap, CheckCircle2,
 } from 'lucide-react';
 import type { ScheduleSession, VotingState, VotingRound } from '@/lib/types';
 
@@ -450,30 +450,43 @@ export default function DashboardClient({
           <TodaysHighlights sessions={schedule} />
         </div>
 
-        {/* Badge CTA */}
-        <div className="relative px-4 py-4 mt-2">
-          <Link
-            href="/me"
-            className="flex items-center justify-center gap-2.5 w-full py-[14px] rounded-[14px] relative overflow-hidden active:scale-[0.98] transition-transform"
-            style={{
-              background:  'linear-gradient(135deg,#FF7A00 0%,#FF4F87 50%,#6B4EFF 100%)',
-              boxShadow:   '0 6px 20px rgba(255,122,0,0.35)',
-            }}
-          >
-            <div className="absolute inset-0 pointer-events-none"
-              style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.12) 0%,transparent 55%)' }} />
-            <QrCode size={18} strokeWidth={2} color="white" />
-            <span className="text-white font-black text-[14px] tracking-tight relative z-10">
-              {isCheckedIn ? 'View My Event Badge' : 'Get My Event Badge'}
-            </span>
-            {isCheckedIn && (
-              <span className="flex items-center gap-1 bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded-full relative z-10">
-                ✓ Checked in
-              </span>
-            )}
-          </Link>
-        </div>
       </div>
+
+      {/* ── CHECK-IN CTA (below hero, always visible) ─────────── */}
+      {isCheckedIn ? (
+        <Link
+          href="/me"
+          className="flex items-center gap-3 w-full px-4 py-3.5 rounded-[18px] mb-5 active:scale-[0.98] transition-transform"
+          style={{ background: '#DCFCE7', border: '1px solid #BBF7D0' }}
+        >
+          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: '#16A34A' }}>
+            <CheckCircle2 size={18} strokeWidth={2.2} color="white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-green-800 leading-tight">Already Checked In</p>
+            <p className="text-[11px] text-green-600 mt-0.5">Tap to view your event pass</p>
+          </div>
+          <QrCode size={16} strokeWidth={1.8} className="text-green-600 shrink-0" />
+        </Link>
+      ) : (
+        <Link
+          href="/me"
+          className="flex items-center justify-center gap-2.5 w-full py-[15px] rounded-[18px] mb-5 relative overflow-hidden active:scale-[0.98] transition-transform"
+          style={{
+            background: 'linear-gradient(135deg,#FF7A00 0%,#FF4F87 60%,#6B4EFF 100%)',
+            boxShadow:  '0 6px 24px rgba(255,122,0,0.40)',
+          }}
+        >
+          <div className="absolute inset-0 pointer-events-none"
+            style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.14) 0%,transparent 55%)' }} />
+          <MapPin size={18} strokeWidth={2} color="white" />
+          <span className="text-white font-black text-[15px] tracking-tight relative z-10">
+            Check In
+          </span>
+          <span className="text-white/60 text-[11px] font-medium relative z-10">· tap to mark attendance</span>
+        </Link>
+      )}
 
       {/* ── UP NEXT ─────────────────────────────────────────── */}
       {schedule.length > 0 && <UpNext sessions={schedule} />}

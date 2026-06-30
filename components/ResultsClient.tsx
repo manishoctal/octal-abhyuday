@@ -1,6 +1,5 @@
 ﻿'use client';
 
-import { useMemo } from 'react';
 import useSWR from 'swr';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -30,12 +29,7 @@ export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
     errorRetryInterval: 3000,
   });
 
-  const announced = data?.state.results_announced ?? false;
-
-  const winners = useMemo(() => {
-    if (!data) return null;
-    return { male: data.male[0], female: data.female[0] };
-  }, [data]);
+  void isAdmin; // prop kept for API compat; user view always shows simple list
 
   if (error && (error as { status?: number }).status === 403) {
     const votingState = (error as { body?: { voting_state?: string } }).body?.voting_state;
@@ -44,125 +38,85 @@ export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
       router.replace('/');
       return null;
     }
-    // Voting ended but results not yet announced — wait for announcement
+    // Voting ended but results not yet announced
     return (
-      <Stage>
-        <div className="text-center py-24 relative z-10">
-          <motion.div
-            animate={{ scale: [1, 1.15, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="text-6xl mb-4"
-          >
-            🔮
-          </motion.div>
-          <h2 className="text-2xl font-extrabold text-white">Results not announced yet</h2>
-          <p className="text-slate-400 mt-2">
-            The suspense is real… results will appear here the moment they&apos;re announced!
-          </p>
-        </div>
-      </Stage>
+      <div className="flex flex-col items-center justify-center py-32 text-center px-8">
+        <motion.div
+          animate={{ scale: [1, 1.15, 1] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="text-6xl mb-4"
+        >
+          🔮
+        </motion.div>
+        <h2 className="text-xl font-extrabold text-slate-900">Results coming soon</h2>
+        <p className="text-slate-500 mt-2 text-sm">
+          Watch the main screen for the announcement!
+        </p>
+      </div>
     );
   }
 
   if (!data) {
     return (
-      <Stage>
-        <div className="flex justify-center py-24 relative z-10">
-          <div className="w-10 h-10 rounded-full border-4 border-slate-700 border-t-amber-400 animate-spin" />
-        </div>
-      </Stage>
+      <div className="flex justify-center py-24">
+        <div className="w-10 h-10 rounded-full border-4 border-slate-200 border-t-orange-400 animate-spin" />
+      </div>
     );
   }
 
-  const previewOnly = !announced && isAdmin;
+  const maleWinner   = data.male[0];
+  const femaleWinner = data.female[0];
 
   return (
-    <Stage>
-      <div className="relative z-10 max-w-3xl mx-auto px-4 pb-24">
-        {previewOnly && (
-          <div className="mt-4 rounded-2xl bg-amber-400/10 border border-amber-400/40 px-4 py-3 text-amber-300 text-sm font-semibold">
-            👁️ Preview — results will be officially announced soon. Stay tuned!
-          </div>
-        )}
+    <div className="max-w-lg mx-auto px-4 pb-24 pt-4">
+      <motion.div key="reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-amber-500 mb-0.5 text-center">
+          Octal IT Solution LLP presents
+        </p>
+        <h1 className="text-2xl font-black text-slate-900 mb-6 text-center">
+          {data.state.event_name}
+        </h1>
 
-        <motion.div
-          key="reveal"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="pt-8"
-        >
-          <div className="text-center mb-8">
-            <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-amber-300/80">
-              Octal IT Solution LLP presents
-            </p>
-            <h1 className="text-3xl sm:text-4xl font-black gold-text leading-tight">
-              {data.state.event_name}
-            </h1>
-            <p className="text-sm font-semibold text-slate-400 mt-1">Most Popular — Winners</p>
-          </div>
+        {/* Winner cards */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          {maleWinner   && <WinnerCard candidate={maleWinner}   label="Most Popular Male"   delay={0}   />}
+          {femaleWinner && <WinnerCard candidate={femaleWinner} label="Most Popular Female" delay={0.2} />}
+        </div>
 
-          <div className="grid sm:grid-cols-2 gap-6 mb-12">
-            {winners?.male && <WinnerCard candidate={winners.male} label="Most Popular Male" emoji="🤵" delay={0} />}
-            {winners?.female && <WinnerCard candidate={winners.female} label="Most Popular Female" emoji="👸" delay={0.3} />}
-          </div>
-
-          <RankedList title="🤵 Male leaderboard" candidates={data.male} />
-          <RankedList title="👸 Female leaderboard" candidates={data.female} />
-        </motion.div>
-      </div>
-    </Stage>
-  );
-}
-
-function Stage({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 relative overflow-hidden">
-      {children}
+        <SimpleRankedList title="🤵 Male leaderboard"   candidates={data.male}   startDelay={0.4} />
+        <SimpleRankedList title="👸 Female leaderboard" candidates={data.female} startDelay={0.5} />
+      </motion.div>
     </div>
   );
 }
 
-function WinnerCard({
-  candidate,
-  label,
-  emoji,
-  delay,
-}: {
-  candidate: CandidateWithVotes;
-  label: string;
-  emoji: string;
-  delay: number;
+function WinnerCard({ candidate, label, delay }: {
+  candidate: CandidateWithVotes; label: string; delay: number;
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 60, rotateY: 90 }}
-      animate={{ opacity: 1, y: 0, rotateY: 0 }}
-      transition={{ delay, type: 'spring', stiffness: 120, damping: 16 }}
-      className="gold-border rounded-3xl"
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, type: 'spring', stiffness: 140, damping: 18 }}
+      className="rounded-3xl overflow-hidden border-2 border-amber-300 bg-white shadow-lg"
     >
-      <div className="bg-slate-900 rounded-3xl p-6 text-center relative overflow-hidden">
-        <div className="text-sm font-bold uppercase tracking-widest text-amber-300">
-          {emoji} {label}
-        </div>
-        <motion.div
-          animate={{ y: [0, -6, 0] }}
-          transition={{ repeat: Infinity, duration: 3 }}
-          className="relative inline-block mt-4"
-        >
+      <div className="bg-gradient-to-b from-amber-50 to-white px-3 pt-6 pb-4 flex flex-col items-center text-center">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-amber-600 mb-3">{label}</p>
+        <div className="relative mb-3">
+          <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-2xl">👑</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={candidate.image_url}
             alt={candidate.name}
-            className="w-28 h-28 rounded-full object-cover mx-auto border-4 border-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.5)]"
+            className="w-24 h-24 rounded-full object-cover border-4 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.4)]"
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(candidate.name)}`;
             }}
           />
-          <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-3xl drop-shadow">👑</span>
-        </motion.div>
-        <h3 className="mt-4 text-2xl font-black gold-text">{candidate.name}</h3>
-        <p className="text-slate-400 text-sm font-semibold mt-1">
+        </div>
+        <p className="font-black text-slate-900 text-[15px] leading-snug">{candidate.name}</p>
+        <p className="text-xs text-amber-600 font-semibold mt-1">
           {candidate.vote_count} vote{candidate.vote_count === 1 ? '' : 's'}
         </p>
       </div>
@@ -170,52 +124,44 @@ function WinnerCard({
   );
 }
 
-function RankedList({ title, candidates }: { title: string; candidates: CandidateWithVotes[] }) {
-  const maxVotes = Math.max(1, ...candidates.map((c) => c.vote_count));
-  const medal = (i: number) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`);
+function SimpleRankedList({ title, candidates, startDelay = 0 }: {
+  title: string; candidates: CandidateWithVotes[]; startDelay?: number;
+}) {
+  const medal = (i: number) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null);
   return (
-    <div className="mb-10">
-      <h2 className="text-lg font-extrabold text-white mb-3">{title}</h2>
+    <div className="mb-8">
+      <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-3">{title}</h2>
       <div className="space-y-2">
         {candidates.map((c, i) => (
           <motion.div
             key={c.id}
-            initial={{ opacity: 0, x: -30 }}
+            initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.6 + i * 0.08 }}
-            className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
-              i === 0
-                ? 'bg-amber-400/10 border border-amber-400/40'
-                : i === 1
-                  ? 'bg-slate-300/10 border border-slate-400/30'
-                  : i === 2
-                    ? 'bg-orange-400/10 border border-orange-400/30'
-                    : 'bg-white/5 border border-white/10'
+            transition={{ delay: startDelay + i * 0.06 }}
+            className={`flex items-center gap-3 rounded-2xl px-4 py-3 border ${
+              i === 0 ? 'bg-amber-50 border-amber-200'
+              : i === 1 ? 'bg-slate-50 border-slate-200'
+              : i === 2 ? 'bg-orange-50 border-orange-200'
+              : 'bg-white border-slate-100'
             }`}
           >
-            <span className="w-8 text-center text-lg font-bold text-slate-300">{medal(i)}</span>
+            <span className="w-7 text-center text-lg shrink-0">
+              {medal(i) ?? <span className="text-sm font-bold text-slate-400">{i + 1}</span>}
+            </span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={c.image_url}
               alt={c.name}
-              className="w-10 h-10 rounded-full object-cover bg-slate-800"
+              className="w-10 h-10 rounded-full object-cover bg-slate-100 shrink-0"
               onError={(e) => {
                 (e.target as HTMLImageElement).src =
                   `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(c.name)}`;
               }}
             />
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-white truncate">{c.name}</p>
-              <div className="mt-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(c.vote_count / maxVotes) * 100}%` }}
-                  transition={{ delay: 0.8 + i * 0.08, duration: 0.6 }}
-                  className={`h-full rounded-full ${i === 0 ? 'bg-amber-400' : 'bg-brand-400'}`}
-                />
-              </div>
-            </div>
-            <span className="text-sm font-bold text-slate-300">{c.vote_count}</span>
+            <p className="flex-1 font-semibold text-slate-900 truncate">{c.name}</p>
+            <span className="text-sm font-bold text-slate-500 shrink-0">
+              {c.vote_count} vote{c.vote_count === 1 ? '' : 's'}
+            </span>
           </motion.div>
         ))}
       </div>

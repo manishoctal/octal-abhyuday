@@ -101,7 +101,7 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
           </div>
 
           {/* Sessions */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {items.map((s: ScheduleSession) => {
               const live = isNow(s);
               const dotColor = TYPE_DOT[s.type] ?? TYPE_DOT.session;
@@ -111,57 +111,48 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
                 <div
                   key={s.id}
                   ref={live ? liveRef : undefined}
-                  className="card flex gap-4 px-4 py-3.5 overflow-hidden transition-all"
+                  className="card px-4 py-4 overflow-hidden transition-all"
                   style={live ? {
                     borderLeft: `3px solid ${dotColor}`,
                     background: `linear-gradient(to right, ${dotColor}0f, white 40%)`,
                     boxShadow: `0 0 0 1px ${dotColor}30, 0 4px 16px ${dotColor}20`,
                   } : {}}
                 >
-                  {/* Time column */}
-                  <div className="text-right shrink-0 w-12">
-                    <p className={`text-xs font-semibold ${live ? 'text-slate-900' : 'text-slate-700'}`}>{fmtTime(s.start_time)}</p>
+                  {/* Time row */}
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${live ? 'animate-pulse' : ''}`}
+                      style={{ background: dotColor, boxShadow: live ? `0 0 0 3px ${dotColor}30` : 'none' }}
+                    />
+                    <span className="text-sm font-bold text-slate-700">{fmtTime(s.start_time)}</span>
                     {s.end_time && (
-                      <p className="text-[10px] text-slate-400">–{fmtTime(s.end_time)}</p>
+                      <span className="text-xs text-slate-400">→ {fmtTime(s.end_time)}</span>
+                    )}
+                    {live && (
+                      <span
+                        className="ml-auto text-[11px] font-black px-2.5 py-0.5 rounded-full shrink-0 animate-pulse"
+                        style={{ background: dotColor, color: 'white', letterSpacing: '0.04em' }}
+                      >
+                        LIVE NOW
+                      </span>
                     )}
                   </div>
 
-                  {/* Dot connector */}
-                  <div className="flex flex-col items-center shrink-0 pt-0.5">
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${live ? 'animate-pulse' : ''}`}
-                      style={{ background: dotColor, boxShadow: live ? `0 0 0 4px ${dotColor}30` : 'none' }}
-                    />
-                    <span className="w-px flex-1 bg-slate-100 mt-1" />
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0 pb-1">
-                    <div className="flex items-start gap-2">
-                      <div
-                        className="w-7 h-7 rounded-xl flex items-center justify-center text-sm shrink-0 mt-0.5"
-                        style={{ background: iconBg }}
-                      >
-                        {TYPE_ICON[s.type]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className={`font-semibold text-[14px] leading-snug ${live ? 'text-slate-900' : 'text-slate-900'}`}>{s.title}</p>
-                          {live && (
-                            <span
-                              className="text-[10px] font-black px-2.5 py-0.5 rounded-full shrink-0 animate-pulse"
-                              style={{ background: dotColor, color: 'white', letterSpacing: '0.04em' }}
-                            >
-                              LIVE NOW
-                            </span>
-                          )}
-                        </div>
-                        {s.speaker && <p className="text-xs text-slate-400 mt-0.5">Speaker: {s.speaker}</p>}
-                        {s.location && <p className="text-xs text-slate-400 mt-0.5">📍 {s.location}</p>}
-                        {s.description && (
-                          <p className="text-xs text-slate-500 mt-1 leading-relaxed whitespace-pre-line">{s.description}</p>
-                        )}
-                      </div>
+                  {/* Content row */}
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0"
+                      style={{ background: iconBg }}
+                    >
+                      {TYPE_ICON[s.type]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-[16px] leading-snug text-slate-900">{s.title}</p>
+                      {s.speaker && <p className="text-sm text-slate-500 mt-1">🎙 {s.speaker}</p>}
+                      {s.location && <p className="text-sm text-slate-500 mt-1">📍 {s.location}</p>}
+                      {s.description && (
+                        <p className="text-sm text-slate-500 mt-1.5 leading-relaxed whitespace-pre-line">{s.description}</p>
+                      )}
                     </div>
                   </div>
                 </div>

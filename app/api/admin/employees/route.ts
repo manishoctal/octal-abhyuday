@@ -64,7 +64,7 @@ export async function POST(req: Request) {
   }
 
   if (action === 'update') {
-    const { id, employee_code, name, email, department, gender, profile_photo_url, is_active } = body;
+    const { id, employee_code, name, email, department, gender, profile_photo_url, is_active, exclude_from_voting } = body;
     if (!id) return NextResponse.json({ error: 'ID required.' }, { status: 400 });
 
     // Check uniqueness for code + email (excluding self)
@@ -83,6 +83,7 @@ export async function POST(req: Request) {
       gender === 'male' || gender === 'female' ? gender : null,
       profile_photo_url?.trim() || null,
       is_active === false || is_active === 0 ? 0 : 1,
+      exclude_from_voting ? 1 : 0,
     );
 
     // Re-register face if photo changed and face service is running
