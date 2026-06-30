@@ -83,18 +83,16 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions.length]);
 
-  if (!sessions.length) {
-    return (
+  return (
+    <div className="space-y-8 pb-4">{!sessions.length ? (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-16 h-16 rounded-3xl bg-slate-100 flex items-center justify-center text-3xl mb-4">📅</div>
+        <div className="w-16 h-16 rounded-3xl bg-slate-100 flex items-center justify-center text-3xl mb-4">
+          <span>&#128197;</span>
+        </div>
         <p className="font-semibold text-slate-700">Schedule not published yet</p>
         <p className="text-sm text-slate-400 mt-1">Check back soon</p>
       </div>
-    );
-  }
-
-  return (
-    <div className="space-y-8 pb-4">
+    ) : null}
       {groups.map(([day, items]) => (
         <section key={day}>
           {/* Day label */}
