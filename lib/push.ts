@@ -59,7 +59,10 @@ export async function sendPushToAll(title: string, body: string, url = '/'): Pro
             credential: cert({
               projectId:    process.env.FIREBASE_PROJECT_ID!,
               clientEmail:  process.env.FIREBASE_CLIENT_EMAIL!,
-              privateKey:   process.env.FIREBASE_PRIVATE_KEY!.replaceAll(String.raw`\n`, '\n'),
+              privateKey:   process.env.FIREBASE_PRIVATE_KEY!
+                .replace(/\\r\\n|\\n|\\r/g, '\n')
+                .replace(/\r\n|\r/g, '\n')
+                .trim(),
             }),
           });
 

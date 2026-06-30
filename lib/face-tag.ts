@@ -1,4 +1,4 @@
-import { getPhotoById, getAllFaceEmbeddings, addPhotoTag } from './db';
+import { getPhotoById, getAllFaceEmbeddings, addPhotoTag, setPhotoTagStatus } from './db';
 
 const FACE_SERVICE = () => process.env.FACE_SERVICE_URL ?? 'http://localhost:8001';
 const THRESHOLD = 0.28;
@@ -66,5 +66,6 @@ export async function tagPhotoById(
     }
   }
 
+  setPhotoTagStatus(photoId, 'done');
   return { tagged, faces: face_count };
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUser, requireAdmin, isErrorResponse } from '@/lib/api-helpers';
-import { listPhotos, listUserPhotos, addPhoto, disablePhoto, enablePhoto, deletePhoto, getPhotoById } from '@/lib/db';
+import { listPhotos, listUserPhotos, addPhoto, disablePhoto, enablePhoto, deletePhoto, getPhotoById, setPhotoTagStatus } from '@/lib/db';
 import { deleteS3Object, isS3Configured } from '@/lib/s3';
 import { generateThumbnailAsync } from '@/lib/thumbnails';
 import { tagPhotoById } from '@/lib/face-tag';
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     for (const { id, url } of results) {
       const photo = getPhotoById(id)!;
       generateThumbnailAsync({ ...photo, url }, DATA_DIR()).catch(() => {});
-      tagPhotoById(id, base).catch(() => {});
+      tagPhotoById(id, base).catch(() => setPhotoTagStatus(id, 'failed'));
     }
     return NextResponse.json({ uploaded: results.length, results });
   }

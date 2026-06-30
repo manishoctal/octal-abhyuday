@@ -16,11 +16,15 @@ function createTransport() {
   });
 }
 
-export async function sendOtpEmail(email: string, code: string, eventName: string): Promise<void> {
+export function isSmtpReady(): boolean {
+  return isSmtpConfigured();
+}
+
+/** Returns true if email was sent, false if SMTP is not configured. */
+export async function sendOtpEmail(email: string, code: string, eventName: string): Promise<boolean> {
   if (!isSmtpConfigured()) {
-    // Dev fallback: log to console instead of sending
     console.log(`[OTP] ${email} → ${code} (SMTP not configured; set SMTP_HOST/USER/PASS to send real emails)`);
-    return;
+    return false;
   }
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER!;
   const transport = createTransport();
@@ -57,4 +61,5 @@ export async function sendOtpEmail(email: string, code: string, eventName: strin
 </body>
 </html>`,
   });
+  return true;
 }

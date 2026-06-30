@@ -53,6 +53,7 @@ interface ConfigData {
   moduleOrder: string[];
   pushStats: { web: number; android: number; ios: number; total: number };
   pushConfig: { vapid: boolean; fcm: boolean };
+  authConfig: { otp_email_enabled: boolean; smtp_ready: boolean; static_otp_code: string };
 }
 
 type AdminEntry = { code: string; name: string | null; department: string | null };
@@ -65,7 +66,8 @@ type AdminsData = {
 export default function AppControlModule() {
   const { data, mutate }             = useSWR<ConfigData>('/api/admin/app-control', fetcher);
   const { data: adminData, mutate: mutateAdmins } = useSWR<AdminsData>('/api/admin/admins', fetcher);
-  const [tab, setTab]         = useState<'homepage'|'access'|'reset'|'push'|'admins'>('homepage');
+  const [tab, setTab]         = useState<'homepage'|'access'|'reset'|'push'|'login'|'admins'>('homepage');
+  const [otpToggling, setOtpToggling] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
   const [resetting, setResetting]       = useState<string | null>(null);
@@ -165,11 +167,23 @@ export default function AppControlModule() {
 
   const isRootAdmin = adminData?.isRootAdmin ?? false;
 
+  async function toggleOtpEmail(enabled: boolean) {
+    setOtpToggling(true);
+    await fetch('/api/admin/app-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otp_email_enabled: enabled }),
+    });
+    await mutate();
+    setOtpToggling(false);
+  }
+
   const tabs = [
     { id: 'homepage', label: 'Homepage' },
     { id: 'access',   label: 'Access' },
     { id: 'reset',    label: 'Reset Data' },
     { id: 'push',     label: 'Push Notify' },
+    { id: 'login',    label: 'Login' },
     ...(isRootAdmin ? [{ id: 'admins', label: 'Admins' }] : []),
   ] as const;
 
@@ -432,6 +446,98 @@ export default function AppControlModule() {
             </div>
             <span className="text-2xl font-black text-slate-800">{data.pushStats.total}</span>
           </div>
+        </div>
+      )}
+
+      {/* ── Login / OTP Settings ── */}
+      {tab === 'login' && data && (
+        <div className="space-y-3">
+          {/* SMTP status */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="font-bold text-slate-900">Email / SMTP</p>
+              <p className="text-xs text-slate-400 mt-0.5">Required to send real OTP codes to employees</p>
+            </div>
+            <div className="px-5 py-4 flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${data.authConfig.smtp_ready ? 'bg-green-50' : 'bg-red-50'}`}>
+                {data.authConfig.smtp_ready
+                  ? <Wifi size={16} className="text-green-600" />
+                  : <WifiOff size={16} className="text-red-500" />}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-slate-900 text-sm">SMTP</p>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${data.authConfig.smtp_ready ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                    {data.authConfig.smtp_ready ? 'Configured' : 'Not configured'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {data.authConfig.smtp_ready
+                    ? 'SMTP_HOST, SMTP_USER, and SMTP_PASS are set.'
+                    : 'Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to enable email delivery.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* OTP mode toggle */}
+          <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${data.authConfig.otp_email_enabled ? 'bg-blue-50' : 'bg-slate-100'}`}>
+                {data.authConfig.otp_email_enabled
+                  ? <Bell size={16} className="text-blue-600" />
+                  : <BellOff size={16} className="text-slate-400" />}
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-slate-900 text-sm">Send real OTPs via email</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {data.authConfig.otp_email_enabled
+                    ? 'Each employee gets a unique 6-digit code emailed to them on login.'
+                    : `Static code is active — every employee uses "${data.authConfig.static_otp_code}" to log in.`}
+                </p>
+              </div>
+              <button
+                onClick={() => toggleOtpEmail(!data.authConfig.otp_email_enabled)}
+                disabled={otpToggling}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
+                  data.authConfig.otp_email_enabled
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                    : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                }`}
+              >
+                {otpToggling
+                  ? <RefreshCw size={12} className="animate-spin" />
+                  : data.authConfig.otp_email_enabled
+                    ? <><Bell size={12}/>On</>
+                    : <><BellOff size={12}/>Off</>}
+              </button>
+            </div>
+          </div>
+
+          {/* Warning: enabled but SMTP not ready */}
+          {data.authConfig.otp_email_enabled && !data.authConfig.smtp_ready && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle size={15} className="text-red-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-800 font-medium">
+                Email OTP is ON but SMTP is not configured. Employees will see an error when they try to log in.
+                Add <code className="bg-red-100 px-1 rounded">SMTP_HOST</code>,{' '}
+                <code className="bg-red-100 px-1 rounded">SMTP_USER</code>, and{' '}
+                <code className="bg-red-100 px-1 rounded">SMTP_PASS</code> to your environment variables.
+              </p>
+            </div>
+          )}
+
+          {/* Info: disabled — static code hint */}
+          {!data.authConfig.otp_email_enabled && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 font-medium">
+                Static code mode is active. All employees log in with code{' '}
+                <code className="bg-amber-100 px-1 rounded font-black">{data.authConfig.static_otp_code}</code>.
+                Set <code className="bg-amber-100 px-1 rounded">OTP_CODE</code> in env to change it, or turn on email OTP above.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

@@ -584,7 +584,7 @@ export default function GalleryClient({
     <>
       {/* ── Delete confirmation ── */}
       {confirmDeleteId !== null && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-xl">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">

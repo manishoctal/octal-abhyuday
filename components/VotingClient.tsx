@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -169,26 +169,19 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
         </div>
       )}
 
-      {/* Both categories side by side — left and right — at every screen size */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-6 pb-24">
-        {(
-          [
-            ['male', '🤵', 'Male'],
-            ['female', '👸', 'Female'],
-          ] as [Gender, string, string][]
-        ).map(([g, emoji, label]) => (
-          <CategorySection
-            key={g}
-            emoji={emoji}
-            label={label}
-            gender={g}
-            round={round}
-            candidates={data.candidates.filter((c) => c.gender === g)}
-            myVotes={myVotes[g]}
-            canVote={!paused && !voting}
-            onVote={setConfirming}
-          />
-        ))}
+      {/* Both categories side by side with a centre divider */}
+      <div className="grid grid-cols-[1fr_1px_1fr] gap-x-3 sm:gap-x-5 pb-24">
+        <CategorySection
+          emoji="🤵" label="Male" gender="male" round={round}
+          candidates={data.candidates.filter((c) => c.gender === 'male')}
+          myVotes={myVotes['male']} canVote={!paused && !voting} onVote={setConfirming}
+        />
+        <div className="bg-slate-200 self-stretch rounded-full" />
+        <CategorySection
+          emoji="👸" label="Female" gender="female" round={round}
+          candidates={data.candidates.filter((c) => c.gender === 'female')}
+          myVotes={myVotes['female']} canVote={!paused && !voting} onVote={setConfirming}
+        />
       </div>
 
       {/* Confirm sheet */}
@@ -284,11 +277,26 @@ function CategorySection({
   onVote: (c: CandidateWithVotes) => void;
 }) {
   const [search, setSearch] = useState('');
-  const maxVotes = Math.max(1, ...candidates.map((c) => c.vote_count));
+
+  // Shuffle once on first load for round 1 (qualifier) so every user sees a random order
+  const shuffleOrder = useRef<Map<number, number> | null>(null);
+  if (round === 1 && shuffleOrder.current === null && candidates.length > 0) {
+    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    shuffleOrder.current = new Map(shuffled.map((c, i) => [c.id, i]));
+  }
+  const displayCandidates = round === 1 && shuffleOrder.current
+    ? [...candidates].sort((a, b) => {
+        const ai = shuffleOrder.current!.get(a.id) ?? 9999;
+        const bi = shuffleOrder.current!.get(b.id) ?? 9999;
+        return ai - bi;
+      })
+    : candidates;
+
+  const maxVotes = Math.max(1, ...displayCandidates.map((c) => c.vote_count));
   const filtered =
     round === 1 && search.trim()
-      ? candidates.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
-      : candidates;
+      ? displayCandidates.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
+      : displayCandidates;
 
   const chip =
     myVotes.length === 0 && candidates.length > 0 ? (

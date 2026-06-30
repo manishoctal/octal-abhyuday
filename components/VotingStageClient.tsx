@@ -348,7 +348,9 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
         {/* Columns */}
         <div className="flex-1 flex flex-col sm:flex-row gap-8 sm:gap-10">
           <GenderColumn title="Mr. ABHYUDAY" emoji="👨" candidates={topMale}   color="#60A5FA" />
-          <div className="hidden sm:block w-px bg-white/10 self-stretch" />
+          {/* Mobile: horizontal rule; Desktop: vertical rule */}
+          <div className="sm:hidden h-px w-full rounded-full" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent)' }} />
+          <div className="hidden sm:block w-px self-stretch rounded-full" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.3) 20%, rgba(255,255,255,0.3) 80%, transparent)' }} />
           <GenderColumn title="Ms. ABHYUDAY" emoji="👩" candidates={topFemale} color="#F472B6" />
         </div>
 

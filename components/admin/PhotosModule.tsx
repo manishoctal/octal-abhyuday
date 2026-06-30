@@ -96,7 +96,7 @@ function ConfirmDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCance
 /* ── Processing sidebar panel ────────────────────────────── */
 interface ThumbStats { missing: number }
 interface FaceRegStats { total_with_photo: number; registered: number }
-interface FaceTagStats { approved_photos: number; photo_tags: number }
+interface FaceTagStats { approved_photos: number; photo_tags: number; untagged: number; failed: number }
 
 function StatusPill({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
@@ -111,11 +111,12 @@ function ProcessingPanel() {
   const [thumbStats,   setThumbStats]   = useState<ThumbStats | null>(null);
   const [regStats,     setRegStats]     = useState<FaceRegStats | null>(null);
   const [tagStats,     setTagStats]     = useState<FaceTagStats | null>(null);
-  const [actionMsg,    setActionMsg]    = useState<{ text: string; ok: boolean } | null>(null);
-  const [regLoading,   setRegLoading]   = useState(false);
-  const [tagLoading,   setTagLoading]   = useState(false);
-  const [thumbLoading, setThumbLoading] = useState(false);
-  const [expanded,     setExpanded]     = useState(true);
+  const [actionMsg,       setActionMsg]       = useState<{ text: string; ok: boolean } | null>(null);
+  const [regLoading,      setRegLoading]      = useState(false);
+  const [tagLoading,      setTagLoading]      = useState(false);
+  const [thumbLoading,    setThumbLoading]    = useState(false);
+  const [pendingLoading,  setPendingLoading]  = useState(false);
+  const [expanded,        setExpanded]        = useState(true);
 
   async function loadStats() {
     const [t, r, g] = await Promise.all([
@@ -168,10 +169,25 @@ function ProcessingPanel() {
     } finally { setTagLoading(false); }
   }
 
-  const thumbOk = thumbStats?.missing === 0;
-  const regOk   = regStats != null && regStats.registered >= regStats.total_with_photo && regStats.total_with_photo > 0;
-  const tagOk   = tagStats != null && tagStats.photo_tags > 0;
-  const allOk   = thumbOk && regOk && tagOk;
+  async function retagPending() {
+    setPendingLoading(true);
+    try {
+      const res = await fetch('/api/faces/tag-pending', { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok) { notify(`Error: ${d.error}`, false); return; }
+      const msg = d.processed === 0
+        ? 'All photos already tagged.'
+        : `Done — ${d.tagged} match${d.tagged !== 1 ? 'es' : ''} in ${d.processed} photo${d.processed !== 1 ? 's' : ''}${d.failed ? ` · ${d.failed} still failed` : ''}`;
+      notify(msg, d.failed === 0);
+      await loadStats();
+    } finally { setPendingLoading(false); }
+  }
+
+  const thumbOk   = thumbStats?.missing === 0;
+  const regOk     = regStats != null && regStats.registered >= regStats.total_with_photo && regStats.total_with_photo > 0;
+  const tagOk     = tagStats != null && tagStats.photo_tags > 0;
+  const pendingOk = tagStats != null && (tagStats.untagged + tagStats.failed) === 0;
+  const allOk     = thumbOk && regOk && tagOk && pendingOk;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -268,6 +284,42 @@ function ProcessingPanel() {
               {tagLoading ? <><Loader2 size={12} className="animate-spin" />Tagging…</> : 'Tag All Photos'}
             </button>
           </div>
+
+          {/* Step 4: Pending / failed photos */}
+          {tagStats != null && (tagStats.untagged > 0 || tagStats.failed > 0) && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle size={12} className="text-amber-500" />
+                  <span className="text-xs font-semibold text-amber-800">Needs Tagging</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  {tagStats.untagged > 0 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                      {tagStats.untagged} pending
+                    </span>
+                  )}
+                  {tagStats.failed > 0 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
+                      {tagStats.failed} failed
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-amber-700 leading-relaxed">
+                These photos were uploaded but face tagging was skipped or failed. &ldquo;Find Me&rdquo; will miss them until re-tagged.
+              </p>
+              <button
+                onClick={retagPending}
+                disabled={pendingLoading}
+                className="w-full py-2 rounded-lg font-bold text-xs text-white disabled:opacity-50 flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 transition"
+              >
+                {pendingLoading
+                  ? <><Loader2 size={12} className="animate-spin" />Re-tagging…</>
+                  : <><ScanFace size={12} />Re-tag {tagStats.untagged + tagStats.failed} Photos</>}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -501,7 +553,7 @@ function UploadPanel({ useS3, onDone }: { useS3: boolean; onDone: () => void }) 
 }
 
 /* ── Photo grid card ─────────────────────────────────────── */
-function PhotoCard({ photo, onClick, onToggle, onDelete, isHidden, toggling, deleting }: {
+function PhotoCard({ photo, onClick, onToggle, onDelete, isHidden, toggling, deleting, onRetag, retagging }: {
   photo: Photo;
   onClick: () => void;
   onToggle: () => void;
@@ -509,6 +561,8 @@ function PhotoCard({ photo, onClick, onToggle, onDelete, isHidden, toggling, del
   isHidden: boolean;
   toggling: boolean;
   deleting: boolean;
+  onRetag: () => void;
+  retagging: boolean;
 }) {
   return (
     <div className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 cursor-pointer">
@@ -559,6 +613,24 @@ function PhotoCard({ photo, onClick, onToggle, onDelete, isHidden, toggling, del
           <span className="text-[10px] text-white/70 font-semibold">Hidden</span>
         </div>
       )}
+
+      {/* Pending tag badge */}
+      {!isHidden && (photo.face_tag_status === null || photo.face_tag_status === 'failed') && (
+        <button
+          onClick={e => { e.stopPropagation(); onRetag(); }}
+          disabled={retagging}
+          title={photo.face_tag_status === 'failed' ? 'Face tagging failed — click to retry' : 'Not yet face-tagged — click to tag'}
+          className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full backdrop-blur-sm transition disabled:opacity-50"
+          style={{ background: photo.face_tag_status === 'failed' ? 'rgba(239,68,68,0.85)' : 'rgba(245,158,11,0.85)' }}
+        >
+          {retagging
+            ? <Loader2 size={9} className="animate-spin text-white" />
+            : <ScanFace size={9} className="text-white" />}
+          <span className="text-[9px] text-white font-bold">
+            {photo.face_tag_status === 'failed' ? 'Failed' : 'Pending'}
+          </span>
+        </button>
+      )}
     </div>
   );
 }
@@ -575,6 +647,7 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
   const [deleteAllInput, setDeleteAllInput] = useState('');
   const [deletingAll, setDeletingAll]     = useState(false);
   const [faceFilterIds, setFaceFilterIds] = useState<number[] | null>(null);
+  const [retagging,     setRetagging]     = useState<number | null>(null);
 
   async function refresh() {
     const d = await fetch('/api/photos?all=1').then(r => r.json());
@@ -603,6 +676,18 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
     });
     setDeleting(null);
     await refresh();
+  }
+
+  async function retagPhoto(id: number) {
+    setRetagging(id);
+    try {
+      await fetch('/api/faces/tag-pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_id: id }),
+      });
+      await refresh();
+    } finally { setRetagging(null); }
   }
 
   async function doDeleteAll() {
@@ -783,9 +868,11 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
                   isHidden={tab === 'hidden'}
                   toggling={toggling === p.id}
                   deleting={deleting === p.id}
+                  retagging={retagging === p.id}
                   onClick={() => setLightbox({ list: tabList, idx: i })}
                   onToggle={() => toggleVisibility(p.id, tab === 'visible')}
                   onDelete={() => setConfirmId(p.id)}
+                  onRetag={() => retagPhoto(p.id)}
                 />
               ))}
             </div>

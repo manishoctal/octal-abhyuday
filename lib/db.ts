@@ -143,6 +143,7 @@ db.exec(`
   INSERT OR IGNORE INTO settings (key, value) VALUES ('event_name', 'ABHYUDAY 2026');
   INSERT OR IGNORE INTO settings (key, value) VALUES ('voting_round', '1');
   INSERT OR IGNORE INTO settings (key, value) VALUES ('total_rounds', '2');
+  INSERT OR IGNORE INTO settings (key, value) VALUES ('otp_email_enabled', '0');
 `);
 
 // ---------- users ----------
@@ -824,11 +825,14 @@ db.exec(`
   );
 `);
 
-// Add thumbnail_url to photos if missing
+// Add thumbnail_url and face_tag_status to photos if missing
 {
   const photoCols = (db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]).map(c => c.name);
   if (!photoCols.includes('thumbnail_url')) {
     db.exec('ALTER TABLE photos ADD COLUMN thumbnail_url TEXT');
+  }
+  if (!photoCols.includes('face_tag_status')) {
+    db.exec("ALTER TABLE photos ADD COLUMN face_tag_status TEXT DEFAULT NULL");
   }
 }
 
@@ -1071,10 +1075,23 @@ export function listAadharWithRoomInfo(): AadharWithEmployee[] {
 export interface Photo {
   id: number; uploader_id: number; uploader_name: string; url: string;
   thumbnail_url: string | null; caption: string | null; session_tag: string | null;
-  approved: number; uploaded_at: string;
+  approved: number; uploaded_at: string; face_tag_status: string | null;
 }
 export function setPhotoThumbnail(id: number, thumbnailUrl: string) {
   db.prepare('UPDATE photos SET thumbnail_url=? WHERE id=?').run(thumbnailUrl, id);
+}
+export function setPhotoTagStatus(id: number, status: 'done' | 'failed') {
+  db.prepare('UPDATE photos SET face_tag_status=? WHERE id=?').run(status, id);
+}
+export function listPhotosNeedingTag(): Photo[] {
+  return db.prepare(
+    "SELECT * FROM photos WHERE approved=1 AND (face_tag_status IS NULL OR face_tag_status='failed') ORDER BY uploaded_at DESC"
+  ).all() as Photo[];
+}
+export function countPhotosNeedingTag(): { untagged: number; failed: number } {
+  const u = (db.prepare("SELECT COUNT(*) as n FROM photos WHERE approved=1 AND face_tag_status IS NULL").get() as { n: number }).n;
+  const f = (db.prepare("SELECT COUNT(*) as n FROM photos WHERE approved=1 AND face_tag_status='failed'").get() as { n: number }).n;
+  return { untagged: u, failed: f };
 }
 export function listPhotosWithoutThumbnail(): Photo[] {
   return db.prepare('SELECT * FROM photos WHERE thumbnail_url IS NULL AND approved != -1 ORDER BY id DESC').all() as Photo[];

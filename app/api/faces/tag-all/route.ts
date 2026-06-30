@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { listPhotos, getAllFaceEmbeddings, addPhotoTag } from '@/lib/db';
+import { listPhotos, getAllFaceEmbeddings, addPhotoTag, setPhotoTagStatus } from '@/lib/db';
 
 const FACE_SERVICE = process.env.FACE_SERVICE_URL ?? 'http://localhost:8001';
 const THRESHOLD = 0.28;
@@ -31,9 +31,9 @@ export async function POST() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: photo.url }),
       });
-      if (!res.ok) { failed++; continue; }
+      if (!res.ok) { failed++; setPhotoTagStatus(photo.id, 'failed'); continue; }
       const data: { embeddings: number[][]; face_count: number } = await res.json();
-      if (data.face_count === 0) { skipped++; continue; }
+      if (data.face_count === 0) { skipped++; setPhotoTagStatus(photo.id, 'done'); continue; }
 
       for (const faceVec of data.embeddings) {
         const best = bestMatch(faceVec, allEmbeddings, THRESHOLD);
@@ -42,8 +42,10 @@ export async function POST() {
           tagged++;
         }
       }
+      setPhotoTagStatus(photo.id, 'done');
     } catch {
       failed++;
+      setPhotoTagStatus(photo.id, 'failed');
     }
   }
 
@@ -54,10 +56,11 @@ export async function GET() {
   const session = await getSession();
   if (!session?.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { db } = await import('@/lib/db');
+  const { db, countPhotosNeedingTag } = await import('@/lib/db');
   const tags = (db.prepare('SELECT COUNT(*) as n FROM photo_tags').get() as { n: number }).n;
   const photos = listPhotos(true).length;
-  return NextResponse.json({ approved_photos: photos, photo_tags: tags });
+  const { untagged, failed } = countPhotosNeedingTag();
+  return NextResponse.json({ approved_photos: photos, photo_tags: tags, untagged, failed });
 }
 
 function bestMatch(

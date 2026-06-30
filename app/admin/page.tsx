@@ -11,7 +11,7 @@ export default function AdminDashboardPage() {
         <p className="text-sm text-slate-500 mt-1">Select a module from the sidebar or the cards below.</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {adminModules.map((m) =>
           m.status === 'live' && m.href ? (
             <Link
