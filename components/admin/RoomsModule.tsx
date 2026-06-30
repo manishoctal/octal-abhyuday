@@ -201,14 +201,20 @@ function AadharViewModal({ emp, onClose }: { emp: AadharRow; onClose: () => void
 
 /* ─── Add-member search popup ────────────────────────────── */
 function AddMemberPopup({
-  roomId, allEmployees, occupantIds, onAdd, onClose,
-}: { roomId: number; allEmployees: Employee[]; occupantIds: Set<number>; onAdd: (emp: Employee) => void; onClose: () => void }) {
+  roomId, allEmployees, occupantIds, onClose,
+}: { roomId: number; allEmployees: Employee[]; occupantIds: Set<number>; onClose: () => void }) {
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState<number | null>(null);
-  const unassigned = allEmployees.filter(e =>
-    !occupantIds.has(e.id) &&
+  const [localAdded, setLocalAdded] = useState<Set<number>>(new Set());
+
+  const allTaken = new Set(Array.from(occupantIds).concat(Array.from(localAdded)));
+
+  const filtered = allEmployees.filter(e =>
+    !allTaken.has(e.id) &&
     (e.name.toLowerCase().includes(q.toLowerCase()) || e.employee_code.toLowerCase().includes(q.toLowerCase()))
   );
+
+  const addedEmployees = allEmployees.filter(e => localAdded.has(e.id));
 
   async function assign(emp: Employee) {
     setAdding(emp.id);
@@ -217,25 +223,41 @@ function AddMemberPopup({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ room_id: roomId, employee_id: emp.id }),
     });
-    onAdd(emp);
+    setLocalAdded(prev => new Set(Array.from(prev).concat(emp.id)));
     setAdding(null);
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
+      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '80vh' }}>
+        {/* Search bar */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 shrink-0">
           <Search size={14} className="text-slate-400" />
           <input autoFocus value={q} onChange={e => setQ(e.target.value)}
-            placeholder="Search employee…"
+            placeholder="Search by name or code…"
             className="flex-1 text-sm outline-none text-slate-800 placeholder:text-slate-400" />
           <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-700"><X size={14} /></button>
         </div>
-        <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
-          {unassigned.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-8">No unassigned employees{q ? ' matching search' : ''}</p>
+
+        {/* Recently added chips */}
+        {addedEmployees.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-4 py-2.5 border-b border-slate-100 bg-green-50 shrink-0">
+            {addedEmployees.map(emp => (
+              <span key={emp.id} className="flex items-center gap-1 text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                <CheckCircle2 size={10} /> {emp.name.split(' ')[0]}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* List */}
+        <div className="overflow-y-auto flex-1 divide-y divide-slate-50">
+          {filtered.length === 0 && (
+            <p className="text-center text-sm text-slate-400 py-8">
+              {q ? 'No employees match your search' : 'All employees assigned'}
+            </p>
           )}
-          {unassigned.map(emp => (
+          {filtered.map(emp => (
             <button key={emp.id} onClick={() => assign(emp)}
               disabled={adding === emp.id}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition text-left disabled:opacity-50">
@@ -244,9 +266,21 @@ function AddMemberPopup({
                 <p className="text-sm font-semibold text-slate-900 truncate">{emp.name}</p>
                 <p className="text-xs text-slate-400">{emp.employee_code}{emp.department ? ` · ${emp.department}` : ''}</p>
               </div>
-              {adding === emp.id ? <Loader2 size={14} className="animate-spin text-slate-400" /> : <UserPlus size={14} className="text-slate-300" />}
+              {adding === emp.id
+                ? <Loader2 size={14} className="animate-spin text-slate-400" />
+                : <UserPlus size={14} className="text-slate-300" />}
             </button>
           ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-slate-100 shrink-0">
+          <button onClick={onClose}
+            className="w-full py-2.5 rounded-2xl font-bold text-sm text-white flex items-center justify-center gap-2"
+            style={{ background: localAdded.size > 0 ? 'linear-gradient(135deg,#FE9234,#FF6B35)' : '#94A3B8' }}>
+            <CheckCircle2 size={14} />
+            {localAdded.size > 0 ? `Done — ${localAdded.size} added` : 'Close'}
+          </button>
         </div>
       </div>
     </div>
@@ -315,8 +349,7 @@ function RoomCard({
           roomId={room.id}
           allEmployees={allEmployees}
           occupantIds={occupantIds}
-          onAdd={() => onRefresh()}
-          onClose={() => setShowAdd(false)}
+          onClose={() => { setShowAdd(false); onRefresh(); }}
         />
       )}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -360,7 +393,7 @@ function RoomCard({
           ) : (
             <>
               <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
-                {room.employees.length} / 3
+                {room.employees.length} {room.employees.length === 1 ? 'person' : 'people'}
               </span>
               <button onClick={() => setEditing(true)}
                 className="p-1.5 rounded-lg text-slate-300 hover:text-brand-500 hover:bg-brand-50 transition">
@@ -394,12 +427,10 @@ function RoomCard({
             <p className="text-xs text-slate-400 text-center py-3">No one assigned yet</p>
           )}
 
-          {room.employees.length < 3 && (
-            <button onClick={() => setShowAdd(true)}
-              className="w-full flex items-center justify-center gap-1.5 border border-dashed border-slate-200 rounded-xl py-2.5 text-xs font-semibold text-slate-400 hover:border-brand-300 hover:text-brand-500 transition">
-              <UserPlus size={13} /> Add Person
-            </button>
-          )}
+          <button onClick={() => setShowAdd(true)}
+            className="w-full flex items-center justify-center gap-1.5 border border-dashed border-slate-200 rounded-xl py-2.5 text-xs font-semibold text-slate-400 hover:border-brand-300 hover:text-brand-500 transition">
+            <UserPlus size={13} /> Add Person
+          </button>
         </div>
       </div>
     </>

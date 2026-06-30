@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, CheckCircle2, Loader2, AlertTriangle, Navigation, ScanLine, X } from 'lucide-react';
+import { MapPin, CheckCircle2, Loader2, AlertTriangle, Navigation, ScanLine, X, Lock } from 'lucide-react';
+import QRCode from 'qrcode';
 
 interface Props {
   userId: number;
@@ -10,11 +11,12 @@ interface Props {
   isCheckedIn: boolean;
   eventName: string;
   photoUrl?: string | null;
+  checkinEnabled?: boolean;
 }
 
 type CheckInState = 'idle' | 'locating' | 'submitting' | 'success' | 'already' | 'error';
 
-export default function MyQrClient({ userId, name, email, isCheckedIn: initial, eventName, photoUrl }: Props) {
+export default function MyQrClient({ userId, name, email, isCheckedIn: initial, eventName, photoUrl, checkinEnabled = true }: Props) {
   const [state, setState]       = useState<CheckInState>(initial ? 'already' : 'idle');
   const [distanceM, setDist]    = useState<number | null>(null);
   const [errorMsg, setError]    = useState('');
@@ -26,6 +28,8 @@ export default function MyQrClient({ userId, name, email, isCheckedIn: initial, 
   const videoRef2     = useRef<HTMLVideoElement>(null);
   const controlsRef2  = useRef<IScanControls | null>(null);
   const scanningRef2  = useRef(false);
+  // Pass QR canvas
+  const passCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const stopScan = useCallback(() => {
     controlsRef2.current?.stop();
@@ -37,9 +41,19 @@ export default function MyQrClient({ userId, name, email, isCheckedIn: initial, 
 
   useEffect(() => () => { controlsRef2.current?.stop(); }, []);
 
+  // Render the pass QR whenever checked-in state is reached
+  const isCheckedInState = state === 'success' || state === 'already';
+  useEffect(() => {
+    if (!isCheckedInState || !passCanvasRef.current) return;
+    QRCode.toCanvas(
+      passCanvasRef.current,
+      JSON.stringify({ t: 'pass', uid: userId, name, email, event: eventName }),
+      { width: 180, margin: 1, color: { dark: '#0F172A', light: '#FFFFFF' } }
+    );
+  }, [isCheckedInState, userId, name, email, eventName]);
+
   async function openScanner() {
     setScanErr(''); setScanStatus('scanning'); setScanOpen(true);
-    // Wait a tick for the video element to mount
     await new Promise(r => setTimeout(r, 100));
     const { BrowserQRCodeReader } = await import('@zxing/browser');
     const reader = new BrowserQRCodeReader();
@@ -49,7 +63,7 @@ export default function MyQrClient({ userId, name, email, isCheckedIn: initial, 
         const text = res.getText();
         let payload: { t?: string; tok?: string } = {};
         try { payload = JSON.parse(text); } catch { return; }
-        if (payload.t !== 'venue_ci' || !payload.tok) return; // not a venue QR — ignore
+        if (payload.t !== 'venue_ci' || !payload.tok) return;
 
         scanningRef2.current = true;
         setScanStatus('verifying');
@@ -161,9 +175,16 @@ export default function MyQrClient({ userId, name, email, isCheckedIn: initial, 
             <p className="text-xs text-slate-400 mt-1">{email}</p>
           </div>
 
-          {/* Status / action */}
-          {(state === 'success' || state === 'already') ? (
-            <div className="w-full flex flex-col items-center gap-2">
+          {/* ── Check-in disabled by admin ── */}
+          {!checkinEnabled ? (
+            <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold"
+              style={{ background: '#F1F5F9', color: '#94A3B8' }}>
+              <Lock size={15} />
+              Check-in is currently disabled
+            </div>
+          ) : isCheckedInState ? (
+            /* ── Success / already checked in ── */
+            <div className="w-full flex flex-col items-center gap-3">
               <div className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold"
                 style={{ background: '#DCFCE7', color: '#15803D' }}>
                 <CheckCircle2 size={18} />
@@ -175,6 +196,15 @@ export default function MyQrClient({ userId, name, email, isCheckedIn: initial, 
                   {distanceM < 1000 ? `${distanceM} m from venue` : `${(distanceM / 1000).toFixed(1)} km from venue`}
                 </p>
               )}
+
+              {/* Pass QR */}
+              <div className="flex flex-col items-center gap-2 pt-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Your Event Pass</p>
+                <div className="p-3 rounded-2xl border border-slate-100 shadow-sm bg-white">
+                  <canvas ref={passCanvasRef} className="rounded-lg" />
+                </div>
+                <p className="text-[10px] text-slate-400 text-center">Show this at the venue entrance</p>
+              </div>
             </div>
           ) : state === 'locating' ? (
             <div className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-blue-50 text-blue-600 text-sm font-semibold">
@@ -216,8 +246,8 @@ export default function MyQrClient({ userId, name, email, isCheckedIn: initial, 
             </div>
           )}
 
-          {/* Inline camera scanner (venue QR) */}
-          {scanOpen && (
+          {/* Inline camera scanner (venue QR) — only shown when checkin enabled */}
+          {checkinEnabled && scanOpen && (
             <div className="w-full space-y-3">
               <div className="relative rounded-2xl overflow-hidden bg-slate-900">
                 <video ref={videoRef2} className="w-full aspect-[4/3] object-cover" playsInline muted autoPlay />

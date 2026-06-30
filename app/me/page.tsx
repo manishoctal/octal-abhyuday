@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
-import { getAppState, getAttendance, getEmployeeByEmail, getRoomForEmployee } from '@/lib/db';
+import { getAppState, getAttendance, getEmployeeByEmail, getRoomForEmployee, getModuleConfig } from '@/lib/db';
 import MyQrClient from '@/components/MyQrClient';
 import RoomCard from '@/components/RoomCard';
 
@@ -13,10 +13,12 @@ export default async function MePage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const appState = getAppState();
-  const attendance = getAttendance(session.id);
-  const emp  = getEmployeeByEmail(session.email);
-  const room = emp ? getRoomForEmployee(emp.id) : null;
+  const appState      = getAppState();
+  const attendance    = getAttendance(session.id);
+  const emp           = getEmployeeByEmail(session.email);
+  const room          = emp ? getRoomForEmployee(emp.id) : null;
+  const moduleConfig  = getModuleConfig();
+  const checkinEnabled = moduleConfig.enabled['badge'] !== false;
 
   return (
     <>
@@ -29,6 +31,7 @@ export default async function MePage() {
           isCheckedIn={!!attendance}
           eventName={appState.event_name}
           photoUrl={emp?.profile_photo_url}
+          checkinEnabled={checkinEnabled}
         />
 
         {room && <RoomCard room={room} />}
