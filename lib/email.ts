@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+﻿import nodemailer from 'nodemailer';
 
 function isSmtpConfigured() {
   return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
@@ -38,7 +38,7 @@ export async function sendOtpEmail(email: string, code: string, eventName: strin
       <table width="440" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
         <tr><td style="background:linear-gradient(135deg,#0F1035,#1E1B4B);padding:32px 36px;text-align:center;">
           <div style="display:inline-block;width:56px;height:56px;background:linear-gradient(135deg,#FF7A00,#FF4F87);border-radius:16px;line-height:56px;text-align:center;font-size:28px;font-weight:900;color:white;margin-bottom:12px;">A</div>
-          <p style="margin:0;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Octal IT Solutions presents</p>
+          <p style="margin:0;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Octal IT Solution LLP presents</p>
           <h1 style="margin:4px 0 0;color:#FF7A00;font-size:28px;font-weight:900;letter-spacing:-1px;">${eventName}</h1>
         </td></tr>
         <tr><td style="padding:36px;">
@@ -49,7 +49,7 @@ export async function sendOtpEmail(email: string, code: string, eventName: strin
           <p style="margin:12px 0 0;color:#94A3B8;font-size:13px;text-align:center;">Valid for 5 minutes · Do not share this code</p>
         </td></tr>
         <tr><td style="background:#F8FAFC;padding:16px 36px;text-align:center;border-top:1px solid #E2E8F0;">
-          <p style="margin:0;color:#CBD5E1;font-size:11px;">Octal IT Solutions LLP · Internal Event Platform</p>
+          <p style="margin:0;color:#CBD5E1;font-size:11px;">Octal IT Solution LLP · Internal Event Platform</p>
         </td></tr>
       </table>
     </td></tr>

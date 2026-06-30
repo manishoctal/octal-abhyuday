@@ -7,14 +7,13 @@ interface Props {
   userId: number;
   name: string;
   email: string;
-  department: string | null;
   isCheckedIn: boolean;
   eventName: string;
 }
 
 type CheckInState = 'idle' | 'locating' | 'submitting' | 'success' | 'already' | 'error';
 
-export default function MyQrClient({ userId, name, email, department, isCheckedIn: initial, eventName }: Props) {
+export default function MyQrClient({ userId, name, email, isCheckedIn: initial, eventName }: Props) {
   const [state, setState]       = useState<CheckInState>(initial ? 'already' : 'idle');
   const [distanceM, setDist]    = useState<number | null>(null);
   const [errorMsg, setError]    = useState('');
@@ -150,7 +149,6 @@ export default function MyQrClient({ userId, name, email, department, isCheckedI
 
           <div className="text-center">
             <p className="font-bold text-slate-900 text-lg leading-tight">{name}</p>
-            {department && <p className="text-sm text-slate-500 mt-0.5">{department}</p>}
             <p className="text-xs text-slate-400 mt-1">{email}</p>
           </div>
 

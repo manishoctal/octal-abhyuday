@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
@@ -137,7 +137,7 @@ export default function LaunchStageClient({
           className="mb-10"
         >
           <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.35em] text-amber-300/60 mb-4">
-            Octal IT Solutions presents
+            Octal IT Solution LLP presents
           </p>
           <h1 className="text-5xl sm:text-8xl font-black leading-none gold-text">{eventName}</h1>
         </motion.div>

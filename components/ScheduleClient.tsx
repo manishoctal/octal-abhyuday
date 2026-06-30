@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { useRealtime } from './useRealtime';
 import type { ScheduleSession } from '@/lib/types';
@@ -59,8 +60,28 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
   });
   useRealtime(['/api/schedule']);
 
+  // Refresh "now" every minute so live indicator stays accurate
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const liveRef = useRef<HTMLDivElement | null>(null);
+  const scrolledRef = useRef(false);
+
   const sessions: ScheduleSession[] = data?.sessions ?? initial;
   const groups = groupByDay(sessions);
+
+  // Auto-scroll to the live session once on mount (after sessions load)
+  useEffect(() => {
+    if (scrolledRef.current || !sessions.length) return;
+    const live = sessions.find(s => isNow(s));
+    if (!live) return;
+    scrolledRef.current = true;
+    setTimeout(() => liveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions.length]);
 
   if (!sessions.length) {
     return (
@@ -73,7 +94,7 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
   }
 
   return (
-    <div className="space-y-8 pb-4">
+    <div className="space-y-8 pb-4" data-tick={tick}>
       {groups.map(([day, items]) => (
         <section key={day}>
           {/* Day label */}
@@ -91,12 +112,17 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
               return (
                 <div
                   key={s.id}
-                  className="card flex gap-4 px-4 py-3.5 overflow-hidden"
-                  style={live ? { borderLeft: `3px solid ${dotColor}` } : {}}
+                  ref={live ? liveRef : undefined}
+                  className="card flex gap-4 px-4 py-3.5 overflow-hidden transition-all"
+                  style={live ? {
+                    borderLeft: `3px solid ${dotColor}`,
+                    background: `linear-gradient(to right, ${dotColor}0f, white 40%)`,
+                    boxShadow: `0 0 0 1px ${dotColor}30, 0 4px 16px ${dotColor}20`,
+                  } : {}}
                 >
                   {/* Time column */}
                   <div className="text-right shrink-0 w-12">
-                    <p className="text-xs font-semibold text-slate-700">{fmtTime(s.start_time)}</p>
+                    <p className={`text-xs font-semibold ${live ? 'text-slate-900' : 'text-slate-700'}`}>{fmtTime(s.start_time)}</p>
                     {s.end_time && (
                       <p className="text-[10px] text-slate-400">–{fmtTime(s.end_time)}</p>
                     )}
@@ -105,8 +131,8 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
                   {/* Dot connector */}
                   <div className="flex flex-col items-center shrink-0 pt-0.5">
                     <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ background: dotColor, boxShadow: live ? `0 0 0 3px ${dotColor}22` : 'none' }}
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${live ? 'animate-pulse' : ''}`}
+                      style={{ background: dotColor, boxShadow: live ? `0 0 0 4px ${dotColor}30` : 'none' }}
                     />
                     <span className="w-px flex-1 bg-slate-100 mt-1" />
                   </div>
@@ -122,13 +148,13 @@ export default function ScheduleClient({ initial }: { initial: ScheduleSession[]
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-[14px] text-slate-900 leading-snug">{s.title}</p>
+                          <p className={`font-semibold text-[14px] leading-snug ${live ? 'text-slate-900' : 'text-slate-900'}`}>{s.title}</p>
                           {live && (
                             <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                              style={{ background: dotColor, color: 'white' }}
+                              className="text-[10px] font-black px-2.5 py-0.5 rounded-full shrink-0 animate-pulse"
+                              style={{ background: dotColor, color: 'white', letterSpacing: '0.04em' }}
                             >
-                              Now
+                              LIVE NOW
                             </span>
                           )}
                         </div>

@@ -1,4 +1,4 @@
-import { getSetting } from '@/lib/db';
+﻿import { getSetting } from '@/lib/db';
 import QRCode from 'qrcode';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +37,7 @@ export default async function InstallPage() {
             A
           </div>
           <h1 className="text-white font-black text-xl tracking-tight">ABHYUDAY</h1>
-          <p className="text-white/50 text-xs mt-1">Octal IT Solutions</p>
+          <p className="text-white/50 text-xs mt-1">Octal IT Solution LLP</p>
           {versionName && (
             <span className="inline-block mt-2 text-xs px-3 py-1 rounded-full text-white/80"
               style={{ background: 'rgba(255,255,255,0.1)' }}>

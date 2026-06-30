@@ -2,14 +2,18 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
-import { getAppState, getLeaderboard, getUserPoints } from '@/lib/db';
+import { getAppState, getLeaderboard, getUserPoints, getModuleConfig } from '@/lib/db';
 import LeaderboardClient from '@/components/LeaderboardClient';
+import ModuleDisabled from '@/components/ModuleDisabled';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LeaderboardPage() {
   const session = await getSession();
   if (!session) redirect('/login');
+  const appState = getAppState();
+  if (getModuleConfig().enabled.leaderboard === false)
+    return <ModuleDisabled eventName={appState.event_name} isAdmin={session.isAdmin} />;
 
   const board = getLeaderboard(50);
   const myPoints = getUserPoints(session.id);

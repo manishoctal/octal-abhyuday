@@ -3,6 +3,7 @@ import { db, getAppState, setSetting } from '@/lib/db';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import type { VotingState } from '@/lib/types';
 import { broadcast } from '@/lib/events';
+import { sendPushToAll } from '@/lib/push';
 
 type Action = 'start' | 'pause' | 'resume' | 'end' | 'announce' | 'reset' | 'back_to_round1';
 
@@ -63,14 +64,21 @@ export async function POST(req: Request) {
     setSetting('voting_state', t.to!);
   }
 
-  const ALERTS: Partial<Record<Action, Parameters<typeof broadcast>[1]>> = {
-    start:    { kind: 'voting_live',        title: '🗳️ Voting is open!',       body: 'Cast your vote now before it closes.' },
-    resume:   { kind: 'voting_live',        title: '🗳️ Voting resumed!',        body: 'Voting is live again — cast your vote.' },
-    pause:    { kind: 'voting_paused',      title: '⏸️ Voting paused',          body: 'Hold tight — voting will resume shortly.' },
-    end:      { kind: 'voting_ended',       title: '🏁 Voting has closed',      body: 'Votes are in! Results coming soon.' },
-    announce: { kind: 'results_announced',  title: '🎉 Results Announced!',     body: 'The winners of ABHYUDAY 2026 are revealed!' },
+  const ALERTS: Partial<Record<Action, Parameters<typeof broadcast>[1] & { pushUrl?: string }>> = {
+    start:    { kind: 'voting_live',        title: '🗳️ Voting is open!',       body: 'Cast your vote now before it closes.',      pushUrl: '/vote'  },
+    resume:   { kind: 'voting_live',        title: '🗳️ Voting resumed!',        body: 'Voting is live again — cast your vote.',    pushUrl: '/vote'  },
+    pause:    { kind: 'voting_paused',      title: '⏸️ Voting paused',          body: 'Hold tight — voting will resume shortly.'                     },
+    end:      { kind: 'voting_ended',       title: '🏁 Voting has closed',      body: 'Votes are in! Results coming soon.'                           },
+    announce: { kind: 'results_announced',  title: '🎉 Results Announced!',     body: 'The winners of ABHYUDAY 2026 are revealed!', pushUrl: '/voting-results' },
   };
 
-  broadcast('state', ALERTS[action]);
+  const alert = ALERTS[action];
+  broadcast('state', alert);
+
+  // Push notification to all devices for key actions
+  if (alert) {
+    sendPushToAll(alert.title!, alert.body!, alert.pushUrl ?? '/').catch(() => {});
+  }
+
   return NextResponse.json({ ok: true, state: getAppState() });
 }

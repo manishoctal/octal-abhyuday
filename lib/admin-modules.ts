@@ -135,4 +135,12 @@ export const adminModules: AdminModule[] = [
     href: '/admin/rooms',
     status: 'live',
   },
+  {
+    id: 'app-control',
+    name: 'App Control',
+    emoji: '⚙️',
+    description: 'Show/hide homepage modules, enable/disable access, reset module data for fresh usage, and diagnose push notification issues',
+    href: '/admin/app-control',
+    status: 'live',
+  },
 ];

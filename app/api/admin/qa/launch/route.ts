@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import { createQaSession, createQuestion, pushQuestionLive, startSession } from '@/lib/qa';
 import { broadcast } from '@/lib/events';
+import { sendPushToAll } from '@/lib/push';
 
 /** Quick-launch for the Polls and Rankings modules: creates a single-question
  *  session of the given kind and puts it live on every screen immediately. */
@@ -38,7 +39,9 @@ export async function POST(req: Request) {
     poll:    { kind: 'poll_live',    title: '📊 New Poll is Live!',    body: prompt.trim().slice(0, 80) },
     ranking: { kind: 'ranking_live', title: '🏅 New Ranking is Live!', body: prompt.trim().slice(0, 80) },
   };
-  broadcast('qa', alertMap[kind]);
+  const alert = alertMap[kind];
+  broadcast('qa', alert);
+  if (alert?.title && alert?.body) sendPushToAll(alert.title, alert.body, '/qna').catch(() => {});
 
   return NextResponse.json({ ok: true, sessionId: qaSession.id, questionId: question.id });
 }

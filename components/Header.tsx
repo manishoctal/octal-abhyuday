@@ -29,16 +29,17 @@ export default function Header({
     router.refresh();
   }
 
+  const isHome = !title && !back;
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl">
-        {/* Gradient bottom border — more premium than a flat line */}
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent" />
         <div
           className="flex items-center h-14 px-4 gap-3 max-w-lg mx-auto"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
-          {/* ── Left: back button OR home logo ── */}
+          {/* Left */}
           {back && !hideBack ? (
             <Link
               href={back}
@@ -47,27 +48,22 @@ export default function Header({
               <ChevronLeft size={19} strokeWidth={2.2} />
             </Link>
           ) : (
-            <Link
-              href="/"
-              className="flex items-center gap-2.5 shrink-0 active:opacity-70 transition-opacity"
-              aria-label="Home"
-            >
+            <Link href="/" className="shrink-0 active:opacity-70 transition-opacity" aria-label="Home">
               <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center shadow-sm shrink-0"
+                className="w-8 h-8 rounded-xl flex items-center justify-center shadow-sm"
                 style={{ background: 'linear-gradient(135deg,#FE9234 0%,#F97316 100%)' }}
               >
                 <span className="text-white font-black text-[13px] leading-none">O</span>
               </div>
-              {!title && (
-                <span className="font-bold text-slate-900 text-[15px] tracking-tight leading-none">
-                  {eventName}
-                </span>
-              )}
             </Link>
           )}
 
-          {/* ── Center: page title ── */}
-          {title ? (
+          {/* Center */}
+          {isHome ? (
+            <span className="flex-1 text-center font-semibold text-slate-900 text-[15px] tracking-tight truncate">
+              {eventName}
+            </span>
+          ) : title ? (
             <span className="flex-1 font-bold text-slate-900 text-[16px] truncate text-center">
               {title}
             </span>
@@ -75,7 +71,7 @@ export default function Header({
             <span className="flex-1" />
           )}
 
-          {/* ── Right: admin badge + logout ── */}
+          {/* Right */}
           <div className="flex items-center gap-2 shrink-0">
             {isAdmin && (
               <Link
@@ -92,24 +88,17 @@ export default function Header({
               className="flex items-center gap-1.5 h-9 px-3 rounded-2xl bg-slate-100 text-slate-600 text-[12px] font-semibold active:bg-red-50 active:text-red-500 transition-colors"
             >
               <LogOut size={13} strokeWidth={2.2} />
-              <span>Logout</span>
+              <span className="hidden xs:inline">Logout</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── Logout confirmation ── */}
       {showDialog && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-6 sm:pb-0">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowDialog(false)}
-          />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDialog(false)} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6 text-center">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-              style={{ background: '#FEF2F2' }}
-            >
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#FEF2F2' }}>
               <LogOut size={24} strokeWidth={1.8} className="text-red-500" />
             </div>
             <h3 className="font-bold text-slate-900 text-lg mb-1">Log out?</h3>

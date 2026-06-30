@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef } from 'react';
 import useSWR from 'swr';
@@ -68,7 +68,7 @@ export default function StageClient() {
         {/* Branding header */}
         <div className="text-center">
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-300/70">
-            Octal IT Solutions presents
+            Octal IT Solution LLP presents
           </p>
           <h1 className="text-3xl sm:text-5xl font-black gold-text leading-tight">
             {data?.eventName ?? '…'}

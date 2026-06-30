@@ -2,14 +2,18 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
-import { getAppState, getFeedback, listScheduleSessions } from '@/lib/db';
+import { getAppState, getFeedback, listScheduleSessions, getModuleConfig } from '@/lib/db';
 import FeedbackClient from '@/components/FeedbackClient';
+import ModuleDisabled from '@/components/ModuleDisabled';
 
 export const dynamic = 'force-dynamic';
 
 export default async function FeedbackPage() {
   const session = await getSession();
   if (!session) redirect('/login');
+  const appState = getAppState();
+  if (getModuleConfig().enabled.feedback === false)
+    return <ModuleDisabled eventName={appState.event_name} isAdmin={session.isAdmin} />;
 
   const existing = getFeedback(session.id);
   const sessions = listScheduleSessions();

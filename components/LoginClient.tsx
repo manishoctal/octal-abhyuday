@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -135,7 +135,7 @@ export default function LoginClient({ eventName }: { eventName: string }) {
             <span className="text-white font-black text-3xl leading-none">A</span>
           </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-1"
-            style={{ color: 'rgba(251,146,60,0.65)' }}>Octal IT Solutions</p>
+            style={{ color: 'rgba(251,146,60,0.65)' }}>Octal IT Solution LLP</p>
           <h1 className="text-[32px] font-black text-white leading-none tracking-[-1.5px]">{eventName}</h1>
           <p className="text-[13px] mt-2 font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>
             Sign in with your employee code
@@ -279,7 +279,7 @@ export default function LoginClient({ eventName }: { eventName: string }) {
         <motion.p className="text-[11px] text-center mt-8"
           style={{ color: 'rgba(255,255,255,0.18)' }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-          Octal IT Solutions LLP · Internal Event Platform
+          Octal IT Solution LLP · Internal Event Platform
         </motion.p>
       </div>
     </main>

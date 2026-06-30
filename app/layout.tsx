@@ -1,14 +1,15 @@
-import type { Metadata, Viewport } from 'next';
+﻿import type { Metadata, Viewport } from 'next';
 import { getAppState } from '@/lib/db';
 import SplashHider from '@/components/SplashHider';
 import EventAlertToast from '@/components/EventAlertToast';
 import AppUpdateCheck from '@/components/AppUpdateCheck';
+import PWAInstallBanner from '@/components/PWAInstallBanner';
 import './globals.css';
 
 export function generateMetadata(): Metadata {
   const eventName = getAppState().event_name;
   return {
-    title: `${eventName} — Octal IT Solutions`,
+    title: `${eventName} — Octal IT Solution LLP`,
     description: `Your event companion for ${eventName} — schedule, voting, Q&A, gallery, and more.`,
     manifest: '/manifest.json',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: eventName },
@@ -32,11 +33,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div id="web-splash" aria-hidden="true">
           <div className="splash-logo">O</div>
           <div className="splash-name">{eventName}</div>
-          <div className="splash-by">Octal IT Solutions</div>
+          <div className="splash-by">Octal IT Solution LLP</div>
         </div>
         <SplashHider />
         <EventAlertToast />
         <AppUpdateCheck />
+        <PWAInstallBanner />
         {children}
       </body>
     </html>

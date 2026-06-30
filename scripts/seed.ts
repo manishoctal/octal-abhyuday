@@ -1,4 +1,4 @@
-/* Seed: tops the candidate pool up to 100 (balanced male/female) and adds a
+﻿/* Seed: tops the candidate pool up to 100 (balanced male/female) and adds a
    demo Q&A session. Idempotent — safe to run repeatedly: `pnpm seed` */
 import { db, createCandidate, getCandidateByEmail, listCandidates } from '../lib/db';
 import { createQaSession, createQuestion, listSessions } from '../lib/qa';
@@ -58,7 +58,7 @@ if (!listSessions().some((s) => s.title === demoTitle)) {
   createQuestion(
     session.id,
     'mcq',
-    'Which year was Octal IT Solutions founded?',
+    'Which year was Octal IT Solution LLP founded?',
     ['2005', '2007', '2010', '2012'],
     1
   );

@@ -9,6 +9,7 @@ import {
   startSession,
 } from '@/lib/qa';
 import { broadcast } from '@/lib/events';
+import { sendPushToAll } from '@/lib/push';
 
 export async function POST(req: Request) {
   const session = await requireAdmin();
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
         if (!s) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
         startSession(s.id);
         broadcast('qa', { kind: 'qa_live', title: '💬 Live Q&A Started!', body: 'Submit your questions now.' });
+        sendPushToAll('💬 Live Q&A Started!', `"${s.title}" — submit your questions now.`, '/qna').catch(() => {});
         return NextResponse.json({ ok: true });
       }
       case 'end_session': {
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
         const q = typeof questionId === 'number' ? getQuestion(questionId) : undefined;
         if (!q) return NextResponse.json({ error: 'Question not found' }, { status: 404 });
         pushQuestionLive(q.id);
+        sendPushToAll('💬 New question is live!', q.prompt.slice(0, 100), '/qna').catch(() => {});
         break;
       }
       case 'reveal': {

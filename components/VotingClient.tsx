@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -66,7 +66,7 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
   const eventHero = (
     <div className="text-center mt-1 mb-4">
       <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.25em] text-brand-500">
-        Octal IT Solutions presents
+        Octal IT Solution LLP presents
       </p>
       <h1 className="text-3xl sm:text-4xl font-black gold-text leading-tight">
         {state.event_name}

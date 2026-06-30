@@ -1,8 +1,7 @@
-'use client';
+﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import useSWR from 'swr';
-import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useRealtime } from './useRealtime';
@@ -21,56 +20,17 @@ interface ResultsResponse {
   state: AppState;
 }
 
-function fireConfetti() {
-  const defaults = { spread: 80, ticks: 120, gravity: 0.9, scalar: 1.1, zIndex: 60 };
-  confetti({ ...defaults, particleCount: 120, origin: { x: 0.2, y: 0.7 }, angle: 60 });
-  confetti({ ...defaults, particleCount: 120, origin: { x: 0.8, y: 0.7 }, angle: 120 });
-  setTimeout(
-    () =>
-      confetti({
-        ...defaults,
-        particleCount: 180,
-        origin: { x: 0.5, y: 0.4 },
-        spread: 360,
-        startVelocity: 35,
-        colors: ['#fbbf24', '#fde68a', '#f59e0b', '#ffffff'],
-      }),
-    400
-  );
-}
-
-const SPARKLES = [
-  { top: '8%', left: '12%', delay: '0s' },
-  { top: '15%', left: '85%', delay: '0.4s' },
-  { top: '30%', left: '5%', delay: '0.8s' },
-  { top: '45%', left: '92%', delay: '0.2s' },
-  { top: '60%', left: '10%', delay: '1.1s' },
-  { top: '75%', left: '88%', delay: '0.6s' },
-  { top: '85%', left: '20%', delay: '1.3s' },
-  { top: '12%', left: '50%', delay: '0.9s' },
-];
 
 export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
-  // SSE pushes the announcement instantly; polling is only a reconnect fallback
   useRealtime(['/api/results']);
   const { data, error } = useSWR<ResultsResponse>('/api/results', fetcher, {
     refreshInterval: 10000,
     shouldRetryOnError: true,
     errorRetryInterval: 3000,
   });
-  const [phase, setPhase] = useState<'drumroll' | 'reveal'>('drumroll');
 
   const announced = data?.state.results_announced ?? false;
-
-  useEffect(() => {
-    if (!announced) return;
-    const t = setTimeout(() => {
-      setPhase('reveal');
-      fireConfetti();
-    }, 2600);
-    return () => clearTimeout(t);
-  }, [announced]);
 
   const winners = useMemo(() => {
     if (!data) return null;
@@ -114,11 +74,10 @@ export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
     );
   }
 
-  // Admin preview before announcement
   const previewOnly = !announced && isAdmin;
 
   return (
-    <Stage lightning={announced && phase === 'reveal'}>
+    <Stage>
       <div className="relative z-10 max-w-3xl mx-auto px-4 pb-24">
         {previewOnly && (
           <div className="mt-4 rounded-2xl bg-amber-400/10 border border-amber-400/40 px-4 py-3 text-amber-300 text-sm font-semibold">
@@ -126,72 +85,38 @@ export default function ResultsClient({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
 
-        {announced && phase === 'drumroll' ? (
-            <motion.div
-              key="drumroll"
-              className="text-center py-28"
-            >
-              <motion.div
-                animate={{ scale: [1, 1.3, 1], rotate: [0, 5, -5, 0] }}
-                transition={{ repeat: Infinity, duration: 0.7 }}
-                className="text-7xl mb-6"
-              >
-                🥁
-              </motion.div>
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-amber-300/80 mb-2">
-                {data.state.event_name}
-              </p>
-              <motion.h2
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ repeat: Infinity, duration: 1 }}
-                className="text-3xl font-extrabold text-white tracking-wide"
-              >
-                And the winners are…
-              </motion.h2>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="reveal"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="pt-8"
-            >
-              <div className="text-center mb-8">
-                <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-amber-300/80">
-                  Octal IT Solutions presents
-                </p>
-                <h1 className="text-3xl sm:text-4xl font-black gold-text leading-tight">
-                  ✨ {data.state.event_name} ✨
-                </h1>
-                <p className="text-sm font-semibold text-slate-400 mt-1">Most Popular — Winners</p>
-              </div>
+        <motion.div
+          key="reveal"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="pt-8"
+        >
+          <div className="text-center mb-8">
+            <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-amber-300/80">
+              Octal IT Solution LLP presents
+            </p>
+            <h1 className="text-3xl sm:text-4xl font-black gold-text leading-tight">
+              {data.state.event_name}
+            </h1>
+            <p className="text-sm font-semibold text-slate-400 mt-1">Most Popular — Winners</p>
+          </div>
 
-              <div className="grid sm:grid-cols-2 gap-6 mb-12">
-                {winners?.male && <WinnerCard candidate={winners.male} label="Most Popular Male" emoji="🤵" delay={0} />}
-                {winners?.female && <WinnerCard candidate={winners.female} label="Most Popular Female" emoji="👸" delay={0.3} />}
-              </div>
+          <div className="grid sm:grid-cols-2 gap-6 mb-12">
+            {winners?.male && <WinnerCard candidate={winners.male} label="Most Popular Male" emoji="🤵" delay={0} />}
+            {winners?.female && <WinnerCard candidate={winners.female} label="Most Popular Female" emoji="👸" delay={0.3} />}
+          </div>
 
-              <RankedList title="🤵 Male leaderboard" candidates={data.male} />
-              <RankedList title="👸 Female leaderboard" candidates={data.female} />
-            </motion.div>
-          )}
+          <RankedList title="🤵 Male leaderboard" candidates={data.male} />
+          <RankedList title="👸 Female leaderboard" candidates={data.female} />
+        </motion.div>
       </div>
     </Stage>
   );
 }
 
-function Stage({ children, lightning }: { children: React.ReactNode; lightning?: boolean }) {
+function Stage({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 relative overflow-hidden">
-      {lightning && (
-        <>
-          <div className="lightning-flash" />
-          <div className="lightning-flash delay" />
-        </>
-      )}
-      {SPARKLES.map((s, i) => (
-        <span key={i} className="sparkle" style={{ top: s.top, left: s.left, animationDelay: s.delay }} />
-      ))}
       {children}
     </div>
   );

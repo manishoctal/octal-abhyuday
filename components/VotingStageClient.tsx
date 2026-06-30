@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import useSWR from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -171,13 +171,24 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
 
   const COLORS = ['#FE9234', '#FFD700', '#FF6B6B', '#4ECDC4', '#A78BFA', '#FFFFFF'];
 
-  // Fire confetti when results are first announced
+  // Drumroll → reveal phase when results are announced
+  const [announcePhase, setAnnouncePhase] = useState<'idle' | 'drumroll' | 'reveal'>('idle');
   const prevResultsAnnounced = useRef(false);
   useEffect(() => {
     if (resultsAnnounced && !prevResultsAnnounced.current) {
-      confetti({ particleCount: 300, spread: 100, origin: { y: 0.5 }, colors: COLORS, zIndex: 200 });
-      setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 60,  origin: { x: 0,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 400);
-      setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 120, origin: { x: 1,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 800);
+      setAnnouncePhase('drumroll');
+      const t = setTimeout(() => {
+        setAnnouncePhase('reveal');
+        // Big confetti burst on reveal
+        confetti({ particleCount: 300, spread: 100, origin: { y: 0.5 }, colors: COLORS, zIndex: 200 });
+        setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 60,  origin: { x: 0,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 400);
+        setTimeout(() => confetti({ particleCount: 200, spread: 80, angle: 120, origin: { x: 1,   y: 0.6 }, colors: COLORS, zIndex: 200 }), 800);
+        setTimeout(() => confetti({ particleCount: 180, spread: 360, startVelocity: 35,
+          origin: { x: 0.5, y: 0.4 }, colors: ['#fbbf24','#fde68a','#f59e0b','#fff'], zIndex: 200 }), 1200);
+        // Fade out reveal overlay after 4s — stage goes back to leaderboard view with sparkles
+        setTimeout(() => setAnnouncePhase('idle'), 4000);
+      }, 2600);
+      return () => clearTimeout(t);
     }
     prevResultsAnnounced.current = resultsAnnounced;
   }, [resultsAnnounced]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -196,6 +207,61 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 relative overflow-hidden text-white">
+
+      {/* Lightning flash on reveal */}
+      {announcePhase === 'reveal' && (
+        <>
+          <div className="lightning-flash" />
+          <div className="lightning-flash delay" />
+        </>
+      )}
+
+      {/* Drumroll overlay */}
+      <AnimatePresence>
+        {announcePhase === 'drumroll' && (
+          <motion.div
+            key="drumroll"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm"
+          >
+            <div className="text-center px-10">
+              <motion.div
+                animate={{ scale: [1, 1.3, 1], rotate: [0, 5, -5, 0] }}
+                transition={{ repeat: Infinity, duration: 0.7 }}
+                className="text-[9rem] mb-6 leading-none"
+              >
+                🥁
+              </motion.div>
+              <p className="text-sm font-bold uppercase tracking-[0.3em] text-amber-300/80 mb-4">
+                {eventName}
+              </p>
+              <motion.h2
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ repeat: Infinity, duration: 1 }}
+                className="text-5xl sm:text-7xl font-black text-white tracking-wide"
+              >
+                And the winners are…
+              </motion.h2>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Reveal flash overlay */}
+      <AnimatePresence>
+        {announcePhase === 'reveal' && (
+          <motion.div
+            key="reveal-flash"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 1.2, ease: 'easeOut' }}
+            className="fixed inset-0 z-40 pointer-events-none bg-white"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Voting ended overlay */}
       <AnimatePresence>
         {votingState === 'ended' && !resultsAnnounced && !winnerBurst && (
@@ -263,7 +329,7 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
         {/* Header */}
         <div className="text-center mb-8">
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-300/70">
-            Octal IT Solutions presents
+            Octal IT Solution LLP presents
           </p>
           <h1 className="text-3xl sm:text-5xl font-black gold-text leading-tight">
             {eventName}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import { getAppState, listCandidates, promoteTopByVotes } from '@/lib/db';
 import { broadcast } from '@/lib/events';
+import { sendPushToAll } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,11 @@ export async function POST(req: Request) {
   const nextRound = state.voting_round + 1;
   const promoted = promoteTopByVotes(m, f, state.voting_round, nextRound);
   broadcast('state');
+  sendPushToAll(
+    `🎖️ Round ${nextRound} is now open!`,
+    `Finalists have been selected — vote now in Round ${nextRound}.`,
+    '/vote'
+  ).catch(() => {});
   return NextResponse.json({
     ok: true,
     state: getAppState(),

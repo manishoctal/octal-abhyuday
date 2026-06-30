@@ -1,6 +1,6 @@
-# Octal Vote 🏆
+﻿# Octal Vote 🏆
 
-Internal voting app for **Octal IT Solutions** — employees vote for *Most Popular Male* and *Most Popular Female*. Mobile-first, fully responsive.
+Internal voting app for **Octal IT Solution LLP** — employees vote for *Most Popular Male* and *Most Popular Female*. Mobile-first, fully responsive.
 
 ## Quick start
 

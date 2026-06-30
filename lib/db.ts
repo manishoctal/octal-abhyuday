@@ -575,6 +575,77 @@ export function regenerateCheckinToken(): string {
   return token;
 }
 
+// ---------- module config ----------
+
+export type ModuleKey = 'schedule'|'awards'|'gallery'|'vote'|'qna'|'leaderboard'|'badge'|'venue'|'feedback';
+
+const ALL_MODULES: ModuleKey[] = ['schedule','awards','gallery','vote','qna','leaderboard','badge','venue','feedback'];
+const DEFAULT_TRUE = Object.fromEntries(ALL_MODULES.map(k => [k, true])) as Record<ModuleKey, boolean>;
+
+export interface ModuleConfig {
+  visibility: Record<ModuleKey, boolean>;
+  enabled:    Record<ModuleKey, boolean>;
+}
+
+export function getModuleConfig(): ModuleConfig {
+  const vis = getSetting('module_visibility');
+  const ena = getSetting('module_enabled');
+  return {
+    visibility: vis ? { ...DEFAULT_TRUE, ...JSON.parse(vis) } : { ...DEFAULT_TRUE },
+    enabled:    ena ? { ...DEFAULT_TRUE, ...JSON.parse(ena) } : { ...DEFAULT_TRUE },
+  };
+}
+
+export function setModuleConfig(visibility: Record<string, boolean>, enabled: Record<string, boolean>) {
+  setSetting('module_visibility', JSON.stringify(visibility));
+  setSetting('module_enabled',    JSON.stringify(enabled));
+}
+
+const DEFAULT_MODULE_ORDER = ['schedule','awards','gallery','vote','qna','leaderboard','badge','venue','feedback'];
+
+export function getModuleOrder(): string[] {
+  const raw = getSetting('module_order');
+  if (!raw) return DEFAULT_MODULE_ORDER;
+  try {
+    const parsed = JSON.parse(raw) as string[];
+    // Merge: keep saved order, append any new keys not yet in saved list
+    const extra = DEFAULT_MODULE_ORDER.filter(k => !parsed.includes(k));
+    return [...parsed, ...extra];
+  } catch { return DEFAULT_MODULE_ORDER; }
+}
+
+export function setModuleOrder(order: string[]): void {
+  setSetting('module_order', JSON.stringify(order));
+}
+
+// ---------- data reset ----------
+
+export function resetVotes()          { db.prepare('DELETE FROM votes').run(); }
+export function resetAttendance()     { db.prepare('DELETE FROM attendance').run(); }
+export function resetPoints()         { db.prepare('DELETE FROM points').run(); }
+export function resetFeedback()       { db.prepare('DELETE FROM feedback').run(); }
+export function resetGallery()        {
+  db.prepare('DELETE FROM photo_tags').run();
+  db.prepare('DELETE FROM face_embeddings').run();
+  db.prepare('DELETE FROM photos').run();
+}
+export function resetRoomAllocations() { db.prepare('DELETE FROM room_allocations').run(); }
+export function resetAadharCards()    { db.prepare('DELETE FROM aadhar_cards').run(); }
+export function resetAwardWinners()   { db.prepare('DELETE FROM award_winners').run(); }
+export function resetPushSubscriptions() { db.prepare('DELETE FROM push_subscriptions').run(); }
+
+export function getPushSubscriptionStats(): { web: number; android: number; ios: number; total: number } {
+  const rows = db.prepare(
+    `SELECT platform, COUNT(*) as cnt FROM push_subscriptions GROUP BY platform`
+  ).all() as { platform: string; cnt: number }[];
+  const byPlatform: Record<string, number> = {};
+  rows.forEach(r => { byPlatform[r.platform] = r.cnt; });
+  const web     = byPlatform['web']     ?? 0;
+  const android = byPlatform['android'] ?? 0;
+  const ios     = byPlatform['ios']     ?? 0;
+  return { web, android, ios, total: web + android + ios };
+}
+
 // ---------- push subscriptions ----------
 
 export function savePushSubscription(userId: number, platform: 'web' | 'android' | 'ios', subscription: string) {
@@ -602,6 +673,26 @@ export function getPushSubscriptionsWithUser() {
     id: number; user_id: number; platform: string; subscription: string;
     email: string; name: string; department: string | null;
   }[];
+}
+
+/* ── Admin code management (DB-backed, managed from admin UI) ── */
+
+export function getDbAdminCodes(): string[] {
+  const raw = getSetting('admin_codes');
+  if (!raw) return [];
+  try { return JSON.parse(raw) as string[]; } catch { return []; }
+}
+
+export function addDbAdminCode(code: string): void {
+  const codes = getDbAdminCodes();
+  const trimmed = code.trim();
+  if (!trimmed || codes.includes(trimmed)) return;
+  setSetting('admin_codes', JSON.stringify([...codes, trimmed]));
+}
+
+export function removeDbAdminCode(code: string): void {
+  const codes = getDbAdminCodes().filter(c => c !== code.trim());
+  setSetting('admin_codes', JSON.stringify(codes));
 }
 
 /** Distinct, non-empty department names — for the notification targeting dropdown. */
