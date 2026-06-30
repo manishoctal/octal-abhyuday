@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { Home, CalendarDays, Zap, ImageIcon, User } from 'lucide-react';
 import { useRealtime } from './useRealtime';
 import { usePushRegistration } from './usePushRegistration';
+import { useWebPushSubscription } from './useWebPushSubscription';
 
 const fetcher = (u: string) => fetch(u).then(r => r.json());
 
@@ -14,6 +15,7 @@ export default function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   const { data } = useSWR('/api/state', fetcher, { refreshInterval: 30000 });
   useRealtime(['/api/state']);
   usePushRegistration();
+  useWebPushSubscription();
 
   const isLive = data?.state?.voting_state === 'live' || data?.state?.voting_state === 'paused';
 

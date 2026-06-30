@@ -660,6 +660,10 @@ export function deletePushSubscription(userId: number, platform: 'web' | 'androi
   db.prepare('DELETE FROM push_subscriptions WHERE user_id = ? AND platform = ?').run(userId, platform);
 }
 
+export function deletePushSubscriptionById(id: number) {
+  db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(id);
+}
+
 export function getAllPushSubscriptions() {
   return db.prepare('SELECT * FROM push_subscriptions').all() as
     { id: number; user_id: number; platform: string; subscription: string }[];

@@ -26,6 +26,14 @@ function isFcmConfigured(): boolean {
   );
 }
 
+function parseFirebaseKey(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^["']|["']$/g, '')      // strip accidental surrounding quotes
+    .replace(/\\r\\n|\\n|\\r/g, '\n') // unescape literal \n / \r\n / \r
+    .replace(/\r\n|\r/g, '\n');       // normalise any real CRLF
+}
+
 export async function sendPushToAll(title: string, body: string, url = '/'): Promise<void> {
   const subs = getPushSubscriptionsWithUser();
   if (!subs.length) return;
@@ -59,10 +67,7 @@ export async function sendPushToAll(title: string, body: string, url = '/'): Pro
             credential: cert({
               projectId:    process.env.FIREBASE_PROJECT_ID!,
               clientEmail:  process.env.FIREBASE_CLIENT_EMAIL!,
-              privateKey:   process.env.FIREBASE_PRIVATE_KEY!
-                .replace(/\\r\\n|\\n|\\r/g, '\n')
-                .replace(/\r\n|\r/g, '\n')
-                .trim(),
+              privateKey:   parseFirebaseKey(process.env.FIREBASE_PRIVATE_KEY!),
             }),
           });
 

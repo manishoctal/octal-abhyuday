@@ -42,9 +42,11 @@ export async function POST(req: Request) {
       let sent = false;
       try {
         sent = await sendOtpEmail(employee.email, code, event_name);
-      } catch {
+      } catch (emailErr) {
+        const msg = emailErr instanceof Error ? emailErr.message : String(emailErr);
+        console.error('[request-otp] sendOtpEmail threw:', msg);
         return NextResponse.json(
-          { error: 'Failed to send email. Contact your administrator.' },
+          { error: `Failed to send email: ${msg}` },
           { status: 503 },
         );
       }
