@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
-
-const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'ap-south-1' });
-const BUCKET   = process.env.S3_BUCKET_NAME  ?? '';
-const CF_BASE  = (process.env.S3_PUBLIC_URL  ?? '').replace(/\/$/, '');
-// Upload under a dedicated prefix so it's easy to find in the S3 console
-const S3_PREFIX = 'abhyuday-releases';
 
 export async function POST(req: Request) {
   const adminOrErr = await requireAdmin();
@@ -26,23 +21,21 @@ export async function POST(req: Request) {
   if (!file.name.toLowerCase().endsWith('.apk')) {
     return NextResponse.json({ error: 'Only .apk files are allowed' }, { status: 400 });
   }
-  if (!BUCKET) return NextResponse.json({ error: 'S3_BUCKET_NAME not configured' }, { status: 500 });
-  if (!CF_BASE) return NextResponse.json({ error: 'S3_PUBLIC_URL not configured' }, { status: 500 });
 
-  // Unique key every upload — CloudFront has never seen this path, so no stale cache
+  const dir = path.join(process.cwd(), 'public', 'releases');
+  fs.mkdirSync(dir, { recursive: true });
+
+  // Delete old APK files to free disk space
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith('.apk')) fs.unlinkSync(path.join(dir, f));
+    }
+  } catch { /* ignore cleanup errors */ }
+
   const slug = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const key  = `${S3_PREFIX}/abhyuday-${slug}.apk`;
+  const filename = `abhyuday-${slug}.apk`;
   const buffer = Buffer.from(await file.arrayBuffer());
+  fs.writeFileSync(path.join(dir, filename), buffer);
 
-  await s3.send(new PutObjectCommand({
-    Bucket:      BUCKET,
-    Key:         key,
-    Body:        buffer,
-    ContentType: 'application/vnd.android.package-archive',
-    ContentDisposition: 'attachment; filename="abhyuday.apk"',
-  }));
-
-  // CloudFront URL is absolute — works directly in QR codes and download links
-  const publicUrl = `${CF_BASE}/${key}`;
-  return NextResponse.json({ publicUrl });
+  return NextResponse.json({ publicUrl: `/releases/${filename}` });
 }

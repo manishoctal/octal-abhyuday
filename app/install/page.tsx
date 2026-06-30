@@ -1,4 +1,5 @@
-﻿import { getSetting } from '@/lib/db';
+﻿import { headers } from 'next/headers';
+import { getSetting } from '@/lib/db';
 import QRCode from 'qrcode';
 
 export const dynamic = 'force-dynamic';
@@ -8,10 +9,18 @@ export default async function InstallPage() {
   const versionName  = getSetting('apk_version_name') ?? '';
   const releaseNotes = getSetting('apk_release_notes') ?? '';
 
-  // QR code encodes the CloudFront URL directly — already absolute, works in phone cameras
+  // Always make the URL absolute — relative paths (/releases/...) break QR scanners
+  const host = headers().get('host') ?? '';
+  const proto = host.startsWith('localhost') ? 'http' : 'https';
+  const absoluteDownloadUrl = downloadUrl.startsWith('http')
+    ? downloadUrl
+    : downloadUrl.startsWith('/')
+      ? `${proto}://${host}${downloadUrl}`
+      : downloadUrl;
+
   let qrSvg = '';
   if (downloadUrl) {
-    qrSvg = await QRCode.toString(downloadUrl, {
+    qrSvg = await QRCode.toString(absoluteDownloadUrl, {
       type: 'svg',
       width: 240,
       margin: 2,
