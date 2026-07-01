@@ -189,10 +189,41 @@ function EmployeeForm({
   );
 }
 
+function FilterGroup({
+  label, value, onChange, options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1">
+      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide pr-1">{label}</span>
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition ${
+            value === opt.value
+              ? 'bg-orange-500 text-white'
+              : 'text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function EmployeesModule({ initial }: { initial: EmployeeWithFace[] }) {
   const [employees, setEmployees] = useState<EmployeeWithFace[]>(initial);
   const [search, setSearch] = useState('');
-  const [faceFilter, setFaceFilter] = useState<'all' | 'missing'>('all');
+  const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female' | 'unset'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [votingFilter, setVotingFilter] = useState<'all' | 'included' | 'excluded'>('all');
+  const [faceFilter, setFaceFilter] = useState<'all' | 'indexed' | 'missing'>('all');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -200,8 +231,10 @@ export default function EmployeesModule({ initial }: { initial: EmployeeWithFace
   const [error, setError] = useState('');
 
   async function refresh() {
-    const d = await fetch('/api/admin/employees').then(r => r.json());
-    setEmployees(d.employees ?? []);
+    const res = await fetch('/api/admin/employees');
+    if (!res.ok) return; // don't wipe list on auth error or server error
+    const d = await res.json();
+    if (Array.isArray(d.employees)) setEmployees(d.employees);
   }
 
   async function api(body: Record<string, unknown>) {
@@ -268,36 +301,29 @@ export default function EmployeesModule({ initial }: { initial: EmployeeWithFace
     await refresh();
   }
 
-  const missingFaceCount = employees.filter(e => !e.face_indexed).length;
   const filtered = employees.filter(e => {
-    if (faceFilter === 'missing' && e.face_indexed) return false;
+    if (genderFilter === 'male'   && e.gender !== 'male')   return false;
+    if (genderFilter === 'female' && e.gender !== 'female') return false;
+    if (genderFilter === 'unset'  && e.gender != null)      return false;
+    if (statusFilter === 'active'   && !e.is_active)  return false;
+    if (statusFilter === 'inactive' && e.is_active)   return false;
+    if (votingFilter === 'included' && e.exclude_from_voting)  return false;
+    if (votingFilter === 'excluded' && !e.exclude_from_voting) return false;
+    if (faceFilter === 'indexed' && !e.face_indexed) return false;
+    if (faceFilter === 'missing' && e.face_indexed)  return false;
     if (!search) return true;
+    const q = search.toLowerCase();
     return (
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.employee_code.toLowerCase().includes(search.toLowerCase()) ||
-      e.email.toLowerCase().includes(search.toLowerCase()) ||
-      (e.department ?? '').toLowerCase().includes(search.toLowerCase())
+      e.name.toLowerCase().includes(q) ||
+      e.employee_code.toLowerCase().includes(q) ||
+      e.email.toLowerCase().includes(q) ||
+      (e.department ?? '').toLowerCase().includes(q)
     );
   });
 
   return (
-    <div className="space-y-5">
-      {/* Header actions */}
-      {missingFaceCount > 0 && (
-        <button
-          onClick={() => setFaceFilter(f => f === 'missing' ? 'all' : 'missing')}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition border ${
-            faceFilter === 'missing'
-              ? 'bg-amber-50 border-amber-300 text-amber-700'
-              : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-600'
-          }`}
-        >
-          <ScanFace size={13} />
-          {faceFilter === 'missing'
-            ? `Showing ${missingFaceCount} without face index — click to show all`
-            : `${missingFaceCount} employee${missingFaceCount !== 1 ? 's' : ''} missing face index — click to filter`}
-        </button>
-      )}
+    <div className="space-y-4">
+      {/* Search + Add */}
       <div className="flex gap-2.5">
         <div className="flex-1 flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2.5 bg-white">
           <Search size={14} className="text-slate-400 shrink-0" />
@@ -313,6 +339,59 @@ export default function EmployeesModule({ initial }: { initial: EmployeeWithFace
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-sm text-white"
             style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}>
             <Plus size={15} /> Add
+          </button>
+        )}
+      </div>
+
+      {/* Filter chips */}
+      <div className="flex flex-wrap gap-2">
+        <FilterGroup
+          label="Gender"
+          value={genderFilter}
+          onChange={v => setGenderFilter(v as typeof genderFilter)}
+          options={[
+            { value: 'all',    label: 'All genders' },
+            { value: 'male',   label: '🤵 Male' },
+            { value: 'female', label: '👸 Female' },
+            { value: 'unset',  label: '⚠️ Not set' },
+          ]}
+        />
+        <FilterGroup
+          label="Status"
+          value={statusFilter}
+          onChange={v => setStatusFilter(v as typeof statusFilter)}
+          options={[
+            { value: 'all',      label: 'All' },
+            { value: 'active',   label: '✅ Active' },
+            { value: 'inactive', label: '🚫 Inactive' },
+          ]}
+        />
+        <FilterGroup
+          label="Voting"
+          value={votingFilter}
+          onChange={v => setVotingFilter(v as typeof votingFilter)}
+          options={[
+            { value: 'all',      label: 'All' },
+            { value: 'included', label: '🗳️ In voting' },
+            { value: 'excluded', label: '🚷 Excluded' },
+          ]}
+        />
+        <FilterGroup
+          label="Face"
+          value={faceFilter}
+          onChange={v => setFaceFilter(v as typeof faceFilter)}
+          options={[
+            { value: 'all',     label: 'All' },
+            { value: 'indexed', label: '✅ Face indexed' },
+            { value: 'missing', label: '❌ No face' },
+          ]}
+        />
+        {(genderFilter !== 'all' || statusFilter !== 'all' || votingFilter !== 'all' || faceFilter !== 'all' || search) && (
+          <button
+            onClick={() => { setGenderFilter('all'); setStatusFilter('all'); setVotingFilter('all'); setFaceFilter('all'); setSearch(''); }}
+            className="text-xs font-semibold text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100"
+          >
+            Clear all
           </button>
         )}
       </div>

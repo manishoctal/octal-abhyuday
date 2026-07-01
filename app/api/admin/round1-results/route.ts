@@ -22,7 +22,8 @@ export async function GET(req: Request) {
 
   if (new URL(req.url).searchParams.get('format') === 'csv') {
     const esc = (v: string | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [`rank,name,gender,email,votes,advancing_to_round_${round + 1}`];
+    const csvNextRound = isRedo ? round : round + 1;
+    const lines = [`rank,name,gender,email,votes,advancing_to_round_${csvNextRound}`];
     for (const list of [male, female]) {
       list.forEach((c, i) => {
         lines.push(

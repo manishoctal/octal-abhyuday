@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRealtime } from '../useRealtime';
 import type { CandidateWithVotes, AppState, Gender, VotingState } from '@/lib/types';
@@ -281,6 +281,7 @@ function RoundResults({
       if (res.ok) {
         onPromoted();
         mutateResults();
+        globalMutate('/api/admin/rounds-preview');
         if (isRedo) setRedoDone(true);
       }
     } finally {
