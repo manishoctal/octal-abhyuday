@@ -11,6 +11,7 @@ export function generateMetadata(): Metadata {
   const title = `${eventName} — Octal IT Solution LLP`;
   const description = `Your event companion for ${eventName} — schedule, voting, Q&A, gallery, and more.`;
   return {
+    metadataBase: new URL('https://abhyuday.octallabs.com'),
     title,
     description,
     manifest: '/manifest.json',
