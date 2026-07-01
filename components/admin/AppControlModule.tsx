@@ -7,6 +7,7 @@ import {
   CalendarDays, Trophy, ImageIcon, Vote, MessageSquare, BarChart3,
   QrCode, MapPin, Star, CheckCircle2, AlertTriangle, Wifi, WifiOff,
   ShieldCheck, ShieldPlus, ShieldOff, X, Crown, ChevronUp, ChevronDown, GripVertical,
+  Timer, Save,
 } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -66,9 +67,46 @@ type AdminsData = {
 export default function AppControlModule() {
   const { data, mutate }             = useSWR<ConfigData>('/api/admin/app-control', fetcher);
   const { data: adminData, mutate: mutateAdmins } = useSWR<AdminsData>('/api/admin/admins', fetcher);
+  const { data: settingsData, mutate: mutateSettings } = useSWR<{ eventName: string; eventDate: string; totalRounds: number }>('/api/admin/settings', fetcher);
   const [tab, setTab]         = useState<'homepage'|'access'|'reset'|'push'|'login'|'admins'>('homepage');
   const [otpToggling, setOtpToggling] = useState(false);
   const [saving, setSaving]   = useState(false);
+
+  // Event settings state
+  const [evtName, setEvtName]       = useState('');
+  const [evtDate, setEvtDate]       = useState('');
+  const [evtSaving, setEvtSaving]   = useState(false);
+  const [evtSaved, setEvtSaved]     = useState(false);
+  const evtSynced = useRef(false);
+  useEffect(() => {
+    if (!evtSynced.current && settingsData) {
+      evtSynced.current = true;
+      setEvtName(settingsData.eventName);
+      // Convert ISO to local datetime-local value (YYYY-MM-DDTHH:mm)
+      if (settingsData.eventDate) {
+        const d = new Date(settingsData.eventDate);
+        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          .toISOString().slice(0, 16);
+        setEvtDate(local);
+      }
+    }
+  }, [settingsData]);
+
+  async function saveEventSettings() {
+    setEvtSaving(true);
+    await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventName: evtName,
+        eventDate: evtDate ? new Date(evtDate).toISOString() : '',
+      }),
+    });
+    await mutateSettings();
+    setEvtSaving(false);
+    setEvtSaved(true);
+    setTimeout(() => setEvtSaved(false), 2500);
+  }
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
   const [resetting, setResetting]       = useState<string | null>(null);
   const [resetDone, setResetDone]       = useState<string | null>(null);
@@ -201,6 +239,60 @@ export default function AppControlModule() {
 
       {/* ── Homepage Visibility + Order ── */}
       {tab === 'homepage' && (
+        <>
+        {/* ── Event Settings ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#FFF4E8' }}>
+              <Timer size={15} style={{ color: '#FE9234' }} />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900">Event Settings</p>
+              <p className="text-xs text-slate-400 mt-0.5">Name shown on homepage · countdown target date &amp; time</p>
+            </div>
+          </div>
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Event Name</label>
+              <input
+                value={evtName}
+                onChange={e => setEvtName(e.target.value)}
+                placeholder="e.g. ABHYUDAY 2026"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                Countdown Target
+              </label>
+              <input
+                type="datetime-local"
+                value={evtDate}
+                onChange={e => setEvtDate(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Leave blank to auto-use the first schedule entry. When the timer hits zero, homepage shows&nbsp;
+                <span className="font-semibold text-green-600">● Event is live!</span>
+              </p>
+            </div>
+            <button
+              onClick={saveEventSettings}
+              disabled={evtSaving || !evtName.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition"
+              style={{ background: 'linear-gradient(135deg,#FE9234,#FF6B35)' }}
+            >
+              {evtSaving
+                ? <RefreshCw size={13} className="animate-spin" />
+                : evtSaved
+                  ? <CheckCircle2 size={13} />
+                  : <Save size={13} />}
+              {evtSaving ? 'Saving…' : evtSaved ? 'Saved!' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Homepage Tiles ── */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <p className="font-bold text-slate-900">Homepage Tiles</p>
@@ -250,6 +342,7 @@ export default function AppControlModule() {
             })}
           </div>
         </div>
+        </>
       )}
 
       {/* ── Module Access ── */}

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import { getAppState, listScheduleSessions, getAttendance, listAllUsers, listAwardCategories, getModuleConfig } from '@/lib/db';
+import { getAppState, listScheduleSessions, getAttendance, listAllUsers, listAwardCategories, getModuleConfig, getSetting } from '@/lib/db';
 import { getLiveSession } from '@/lib/qa';
 import DashboardClient from '@/components/DashboardClient';
 
@@ -17,7 +17,8 @@ export default async function HomePage() {
   const liveQa      = getLiveSession();
   const participants  = listAllUsers().length;
   const awardCount    = listAwardCategories().length;
-  const moduleConfig  = getModuleConfig();
+  const moduleConfig      = getModuleConfig();
+  const eventCountdownDate = getSetting('event_date') || null;
 
   return (
     <>
@@ -36,6 +37,7 @@ export default async function HomePage() {
           awardCount={awardCount}
           moduleVisibility={moduleConfig.visibility}
           moduleEnabled={moduleConfig.enabled}
+          eventCountdownDate={eventCountdownDate}
         />
       </main>
 

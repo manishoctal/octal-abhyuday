@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
-import { setSetting, getAppState } from '@/lib/db';
+import { setSetting, getSetting, getAppState } from '@/lib/db';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import { broadcast } from '@/lib/events';
+
+export async function GET() {
+  const session = await requireAdmin();
+  if (isErrorResponse(session)) return session;
+
+  return NextResponse.json({
+    eventName:      getSetting('event_name') ?? '',
+    eventDate:      getSetting('event_date') ?? '',
+    totalRounds:    Number(getSetting('total_rounds') ?? 2),
+  });
+}
 
 export async function POST(req: Request) {
   const session = await requireAdmin();
@@ -15,6 +26,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Event name must be 1–60 characters' }, { status: 400 });
     }
     setSetting('event_name', eventName.trim());
+  }
+
+  if ('eventDate' in body) {
+    const raw = body.eventDate as string;
+    if (raw === '') {
+      setSetting('event_date', '');
+    } else {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) {
+        return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+      }
+      setSetting('event_date', d.toISOString());
+    }
   }
 
   if ('totalRounds' in body) {

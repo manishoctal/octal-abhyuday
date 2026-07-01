@@ -26,6 +26,7 @@ interface Props {
   awardCount?:   number;
   moduleVisibility?: Record<string, boolean>;
   moduleEnabled?:    Record<string, boolean>;
+  eventCountdownDate?: string | null;
 }
 
 /* ── Countdown ─────────────────────────────────────────────── */
@@ -277,7 +278,7 @@ const TILES: Tile[] = [
     gradient:'linear-gradient(140deg,#78350F,#B45309 55%,#D97706)',    show:()=>true },
   { href:'/gallery',     icon:<ImageIcon    size={22} strokeWidth={1.7}/>, label:'Gallery',   desc:'Event photos',
     gradient:'linear-gradient(140deg,#4C1D95,#7C3AED 55%,#A78BFA)',   show:()=>true },
-  { href:'/vote',        icon:<Vote         size={22} strokeWidth={1.7}/>, label:'Vote',      desc:'Cast your vote',
+  { href:'/vote',        icon:<Vote         size={22} strokeWidth={1.7}/>, label:'Most Popular',      desc:'Cast your vote',
     gradient:'linear-gradient(140deg,#9A3412,#EA580C 55%,#FB923C)',    liveKey:'voting', show:v=>v==='live'||v==='paused' },
   { href:'/qna',         icon:<MessageSquare size={22} strokeWidth={1.7}/>, label:'Q&A',     desc:'Live questions',
     gradient:'linear-gradient(140deg,#064E3B,#059669 55%,#34D399)',    liveKey:'qna',    show:()=>true },
@@ -307,11 +308,14 @@ function LivePill() {
 export default function DashboardClient({
   eventName, schedule, votingState, isCheckedIn, liveQa,
   moduleVisibility: initVisibility, moduleEnabled: initEnabled,
+  eventCountdownDate,
 }: Props) {
   const firstSession = schedule[0];
-  const eventDate = firstSession
-    ? new Date(firstSession.start_time)
-    : new Date(Date.now() + 7 * 86400000);
+  const eventDate = eventCountdownDate
+    ? new Date(eventCountdownDate)
+    : firstSession
+      ? new Date(firstSession.start_time)
+      : new Date(Date.now() + 7 * 86400000);
 
   const anyLive    = votingState === 'live' || !!liveQa;
   const liveModules = { voting: votingState === 'live', qna: !!liveQa };
