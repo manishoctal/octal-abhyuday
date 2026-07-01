@@ -32,23 +32,30 @@ export async function POST(req: Request) {
     }
   }
 
-  // Bulk: re-tag all untagged + failed
+  // Bulk: re-tag all untagged + failed, 4 at a time (resize proxy keeps images small)
   const photos = listPhotosNeedingTag();
   if (!photos.length) return NextResponse.json({ ok: true, processed: 0, tagged: 0, failed: 0 });
 
+  const CONCURRENCY = 4;
   let tagged = 0, failed = 0;
   let lastError = '';
-  for (const photo of photos) {
-    try {
-      const result = await tagPhotoById(photo.id, base);
-      tagged += result.tagged;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!lastError) lastError = msg;
-      console.error(`[tag-pending] photo ${photo.id} failed:`, msg);
-      setPhotoTagStatus(photo.id, 'failed');
-      failed++;
-    }
+
+  for (let i = 0; i < photos.length; i += CONCURRENCY) {
+    const batch = photos.slice(i, i + CONCURRENCY);
+    await Promise.allSettled(
+      batch.map(async (photo) => {
+        try {
+          const result = await tagPhotoById(photo.id, base);
+          tagged += result.tagged;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (!lastError) lastError = msg;
+          console.error(`[tag-pending] photo ${photo.id} failed:`, msg);
+          setPhotoTagStatus(photo.id, 'failed');
+          failed++;
+        }
+      })
+    );
   }
 
   return NextResponse.json({ ok: true, processed: photos.length, tagged, failed, lastError: lastError || undefined });

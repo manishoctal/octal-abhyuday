@@ -47,13 +47,14 @@ export async function tagPhotoById(
     return { tagged: 0, faces: 0 };
   }
 
-  // Resolve to an absolute URL the face service can reach
-  const photoUrl = photo.url.startsWith('http') ? photo.url : `${baseUrl}${photo.url}`;
+  // Use our resize proxy so the face service receives a ≤1920px JPEG instead of
+  // the raw 15-25 MB original. The proxy fetches from S3/disk and resizes via Sharp.
+  const faceUrl = `${baseUrl}/api/face-resize?id=${photoId}`;
 
   const res = await fetch(`${FACE_SERVICE()}/embed-all/url`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: photoUrl }),
+    body: JSON.stringify({ url: faceUrl }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
