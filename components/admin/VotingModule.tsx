@@ -220,6 +220,8 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
 
         <TopFive title={`🤵 Top 10 — Male (Round ${round})`} list={data.topMale} />
         <TopFive title={`👸 Top 10 — Female (Round ${round})`} list={data.topFemale} />
+
+        <RoundsPreviewPanel totalRounds={totalRounds} />
       </div>
     </div>
   );
@@ -242,10 +244,11 @@ function RoundResults({
   notify: (msg: string) => void;
   onPromoted: () => void;
 }) {
-  const { data } = useSWR<RoundResultsResponse>('/api/admin/round1-results', fetcher);
+  const { data, mutate: mutateResults } = useSWR<RoundResultsResponse>('/api/admin/round1-results', fetcher);
   const [maleCount, setMaleCount] = useState(15);
   const [femaleCount, setFemaleCount] = useState(15);
   const [busy, setBusy] = useState(false);
+  const [redoDone, setRedoDone] = useState(false);
 
   if (!data) return <Spinner />;
 
@@ -261,10 +264,7 @@ function RoundResults({
     const confirmMsg = isRedo
       ? `Re-select the top ${maleCount} male + ${femaleCount} female finalists for Round ${round} (by Round ${displayRound} votes)? This replaces the current selection.`
       : `Promote the top ${maleCount} male + top ${femaleCount} female to Round ${nextRound}${nextRound === state.total_rounds ? ' (Grand Finale)' : ''}? Ties at the cutoff are included.`;
-    if (
-      !window.confirm(confirmMsg)
-    )
-      return;
+    if (!window.confirm(confirmMsg)) return;
     setBusy(true);
     try {
       const res = await fetch('/api/admin/round1-results', {
@@ -275,10 +275,14 @@ function RoundResults({
       const body = await res.json();
       notify(
         res.ok
-          ? `🏆 ${body.finalists.male.length} male + ${body.finalists.female.length} female promoted to Round ${body.nextRound}!`
+          ? `🏆 ${body.finalists.male.length} male + ${body.finalists.female.length} female ${isRedo ? 'updated for' : 'promoted to'} Round ${body.nextRound}!`
           : (body.error ?? 'Promotion failed')
       );
-      if (res.ok) onPromoted();
+      if (res.ok) {
+        onPromoted();
+        mutateResults();
+        if (isRedo) setRedoDone(true);
+      }
     } finally {
       setBusy(false);
     }
@@ -325,17 +329,23 @@ function RoundResults({
   );
 
   const roundLabel = isFinalRound
-    ? `Round ${round} (Grand Finale)`
+    ? `Round ${round} (Grand Finale) results`
     : isRedo
       ? `Round ${displayRound} results`
-      : `Round ${round}`;
+      : `Round ${round} results`;
 
   return (
     <div className={`bg-white rounded-2xl p-5 ${mode === 'promote' ? 'border-2 border-brand-200' : 'border border-slate-200'}`}>
+      {redoDone && (
+        <div className="mb-4 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm font-semibold text-green-700 flex items-center gap-2">
+          ✅ Round {round} finalists updated — top {maleCount} male + {femaleCount} female are now set. Start Round {round} when ready.
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-extrabold text-slate-900">
-          📋 {roundLabel} results
-          {isRedo && <span className="ml-2 text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">re-selecting Round {round} finalists</span>}
+          📋 {roundLabel}
+          {isRedo && !redoDone && <span className="ml-2 text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">re-selecting Round {round} finalists</span>}
+          {isRedo && redoDone && <span className="ml-2 text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">updated ✓</span>}
           {mode === 'view' && !isFinalRound && !isRedo && <span className="text-slate-400 font-semibold">(reference)</span>}
         </h3>
         <a
@@ -571,6 +581,217 @@ function TopFive({ title, list }: { title: string; list: CandidateWithVotes[] })
             <span className="font-bold text-brand-600">{c.vote_count}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Rounds Preview ---------------- */
+
+interface RoundData {
+  round: number;
+  status: string;
+  male: CandidateWithVotes[] | null;
+  female: CandidateWithVotes[] | null;
+}
+interface RoundsPreviewResponse {
+  rounds: RoundData[];
+  state: AppState;
+}
+
+function RoundsPreviewPanel({ totalRounds }: { totalRounds: number }) {
+  const { data, mutate } = useSWR<RoundsPreviewResponse>('/api/admin/rounds-preview', fetcher, {
+    refreshInterval: 15000,
+  });
+  useRealtime(['/api/admin/rounds-preview']);
+  const [open, setOpen] = useState(false);
+  const [activeRound, setActiveRound] = useState(1);
+
+  if (!data) return null;
+
+  const { rounds, state } = data;
+
+  const roundLabel = (r: number) =>
+    r === state.total_rounds
+      ? 'Grand Finale'
+      : r === 1
+        ? 'Qualifier'
+        : `Semi-Final`;
+
+  const statusBadge = (status: string, r: number) => {
+    if (status === 'pending') return <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase">Not yet selected</span>;
+    if (status === 'live') return <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full uppercase animate-pulse">Live</span>;
+    if (status === 'paused') return <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full uppercase">Paused</span>;
+    if (status === 'ended') return <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full uppercase">Ended</span>;
+    if (status === 'not_started' && r === state.voting_round) return <span className="text-[10px] font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full uppercase">Ready</span>;
+    return null;
+  };
+
+  const activeData = rounds.find((r) => r.round === activeRound);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      {/* Header — click to expand/collapse */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition"
+      >
+        <span className="font-extrabold text-slate-900 flex items-center gap-2">
+          📺 Employee App Preview
+          <span className="text-xs font-semibold text-slate-400">(what employees see per round)</span>
+        </span>
+        <span className="text-slate-400 text-lg">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100">
+          {/* Round tabs */}
+          <div className="flex gap-1 px-5 pt-4 pb-2 overflow-x-auto">
+            {rounds.map((rd) => (
+              <button
+                key={rd.round}
+                onClick={() => setActiveRound(rd.round)}
+                className={`flex-none flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition ${
+                  activeRound === rd.round
+                    ? 'bg-brand-600 text-white shadow'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Round {rd.round}
+                <span className={`text-[10px] font-semibold ${activeRound === rd.round ? 'text-brand-200' : 'text-slate-400'}`}>
+                  {roundLabel(rd.round)}
+                </span>
+                {rd.status === 'live' && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {activeData && (
+            <div className="px-5 pb-5">
+              {/* Round header bar */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-sm font-extrabold text-slate-700">
+                  Round {activeData.round} — {roundLabel(activeData.round)}
+                </span>
+                {statusBadge(activeData.status, activeData.round)}
+                <button
+                  onClick={() => mutate()}
+                  className="ml-auto text-xs text-slate-400 hover:text-slate-600 font-semibold"
+                >
+                  ↻ Refresh
+                </button>
+              </div>
+
+              {activeData.status === 'pending' ? (
+                <div className="text-center py-12 text-slate-400">
+                  <div className="text-4xl mb-3">🔒</div>
+                  <p className="font-semibold">Finalists not yet selected</p>
+                  <p className="text-sm mt-1">Complete Round {activeData.round - 1} and promote candidates first.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-[1fr_1px_1fr] gap-x-4">
+                  {/* Male column */}
+                  <PreviewColumn
+                    emoji="🤵"
+                    label="Male"
+                    candidates={activeData.male ?? []}
+                    isQualifier={activeData.round === 1}
+                  />
+                  <div className="bg-slate-200 self-stretch rounded-full" />
+                  {/* Female column */}
+                  <PreviewColumn
+                    emoji="👸"
+                    label="Female"
+                    candidates={activeData.female ?? []}
+                    isQualifier={activeData.round === 1}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PreviewColumn({
+  emoji,
+  label,
+  candidates,
+  isQualifier,
+}: {
+  emoji: string;
+  label: string;
+  candidates: CandidateWithVotes[];
+  isQualifier: boolean;
+}) {
+  const maxVotes = Math.max(1, ...candidates.map((c) => c.vote_count));
+
+  if (candidates.length === 0) {
+    return (
+      <div className="text-center py-8 text-sm text-slate-400">
+        No {label.toLowerCase()} candidates.
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-w-0">
+      <div className="rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2 flex items-center justify-between mb-2">
+        <h4 className="font-extrabold text-slate-900 text-sm">{emoji} {label}</h4>
+        <span className="text-[10px] font-bold text-slate-400">{candidates.length} candidates</span>
+      </div>
+      <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+        {candidates.map((c, i) => {
+          const share = maxVotes > 0 ? (c.vote_count / maxVotes) * 100 : 0;
+          const isTop = !isQualifier && i === 0 && c.vote_count > 0;
+          return (
+            <div
+              key={c.id}
+              className={`relative bg-white rounded-2xl px-2.5 py-3 border flex flex-col items-center text-center gap-1 ${
+                isTop ? 'border-amber-300' : 'border-slate-200'
+              }`}
+            >
+              {!isQualifier && (
+                <span
+                  className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold ${
+                    i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-200 text-slate-700' : i === 2 ? 'bg-orange-200 text-orange-800' : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {i + 1}
+                </span>
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={c.image_url}
+                alt={c.name}
+                className="w-12 h-12 rounded-full object-cover bg-slate-100 border-2 border-white shadow"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(c.name)}`;
+                }}
+              />
+              {isTop && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-base">👑</span>}
+              <p className="font-bold text-slate-900 text-xs leading-tight truncate w-full px-1" title={c.name}>
+                {c.name}
+              </p>
+              {!isQualifier && (
+                <>
+                  <div className="w-full h-1 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${isTop ? 'bg-amber-400' : 'bg-brand-500'}`}
+                      style={{ width: `${share}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] font-semibold text-slate-500">{c.vote_count} vote{c.vote_count === 1 ? '' : 's'}</p>
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

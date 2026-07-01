@@ -27,6 +27,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'This candidate did not advance to this round' }, { status: 409 });
   }
 
+  const emailMatch = candidate.email && session.email &&
+    candidate.email.toLowerCase() === session.email.toLowerCase();
+  const codeMatch = candidate.employee_code && session.employee_code &&
+    candidate.employee_code === session.employee_code;
+  if (emailMatch || codeMatch) {
+    return NextResponse.json({ error: 'You cannot vote for yourself' }, { status: 403 });
+  }
+
   // Both rounds: one changeable vote per gender
   setVote(session.id, candidate.id, candidate.gender, state.voting_round);
   awardPoints(session.id, 'voted', 10);

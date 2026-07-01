@@ -483,6 +483,11 @@ export function updateUserProfile(userId: number, department: string | null, pro
   );
   if (profilePhotoUrl) {
     const user = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
+    if (user?.email) {
+      db.prepare('UPDATE employees SET profile_photo_url = ? WHERE lower(email) = ?').run(
+        profilePhotoUrl, user.email.toLowerCase()
+      );
+    }
     syncCandidatePhoto(user?.email, profilePhotoUrl);
   }
 }
@@ -1332,6 +1337,29 @@ if (!candidateColsV2.includes('employee_code')) {
     } catch { /* already exists under a different unique constraint */ }
   }
   if (seeded > 0) console.log(`[db] Seeded ${seeded} employee(s) from candidates table.`);
+}
+
+// Back-fill employees.profile_photo_url from users where employees still have the old photo.
+// Catches up any profile photos employees uploaded via the /me page before this sync was added.
+{
+  const result = db.prepare(`
+    UPDATE employees
+    SET profile_photo_url = (
+      SELECT u.profile_photo_url
+      FROM users u
+      WHERE lower(u.email) = lower(employees.email)
+        AND u.profile_photo_url IS NOT NULL
+    )
+    WHERE EXISTS (
+      SELECT 1 FROM users u
+      WHERE lower(u.email) = lower(employees.email)
+        AND u.profile_photo_url IS NOT NULL
+        AND (employees.profile_photo_url IS NULL
+             OR u.profile_photo_url != employees.profile_photo_url)
+    )
+  `).run() as { changes: number };
+  if (result.changes > 0)
+    console.log(`[db] Synced profile photos for ${result.changes} employee(s) from users table.`);
 }
 
 export interface Employee {
