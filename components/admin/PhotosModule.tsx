@@ -271,18 +271,31 @@ function ProcessingPanel({ onRefresh }: { onRefresh?: () => void }) {
                 ? <span className="text-[11px] text-slate-400">…</span>
                 : tagStats.approved_photos === 0
                   ? <StatusPill ok>No photos yet</StatusPill>
-                  : tagOk
+                  : tagOk && pendingOk
                     ? <StatusPill ok>{tagStats.photo_tags} tags</StatusPill>
                     : <StatusPill ok={false}>0 tagged</StatusPill>}
             </div>
-            <button
-              onClick={tagAll}
-              disabled={tagLoading}
-              className="w-full py-2 rounded-lg font-bold text-xs text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
-              style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}
-            >
-              {tagLoading ? <><Loader2 size={12} className="animate-spin" />Tagging…</> : 'Tag All Photos'}
-            </button>
+            {/* Show big button only when tagging is actually needed */}
+            {!(tagOk && pendingOk) && (
+              <button
+                onClick={tagAll}
+                disabled={tagLoading}
+                className="w-full py-2 rounded-lg font-bold text-xs text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+                style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}
+              >
+                {tagLoading ? <><Loader2 size={12} className="animate-spin" />Tagging…</> : 'Tag All Photos'}
+              </button>
+            )}
+            {/* When all done — small secondary re-tag link */}
+            {tagOk && pendingOk && tagStats != null && tagStats.approved_photos > 0 && (
+              <button
+                onClick={tagAll}
+                disabled={tagLoading}
+                className="w-full py-1.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition flex items-center justify-center gap-1 disabled:opacity-40"
+              >
+                {tagLoading ? <><Loader2 size={10} className="animate-spin" />Re-tagging…</> : <><ScanFace size={10} />Re-tag All</>}
+              </button>
+            )}
           </div>
 
           {/* Step 4: Pending / failed photos */}
