@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, CloudUpload, AlertCircle, ScanFace, Loader2 } from 'lucide-react';
+import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, CloudUpload, AlertCircle, ScanFace, Loader2, Download, Trash2 } from 'lucide-react';
 import { useRealtime } from './useRealtime';
 import type { Photo } from '@/lib/db';
 
@@ -96,84 +96,174 @@ function Lightbox({
   userId: number;
   onDelete: (id: number) => void;
 }) {
-  const [cur, setCur]           = useState(index);
+  const [cur, setCur]                     = useState(index);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [zoom, setZoom]                   = useState(1);
+  const [pan, setPan]                     = useState({ x: 0, y: 0 });
   const p = photos[cur];
 
-  // Reset delete confirm when photo changes
-  useEffect(() => { setConfirmDelete(false); }, [cur]);
+  function resetZoom() { setZoom(1); setPan({ x: 0, y: 0 }); }
+
+  useEffect(() => { setConfirmDelete(false); resetZoom(); }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (zoom > 1) { if (e.key === 'Escape') resetZoom(); return; }
       if (e.key === 'ArrowLeft')  setCur(i => Math.max(0, i - 1));
       if (e.key === 'ArrowRight') setCur(i => Math.min(photos.length - 1, i + 1));
       if (e.key === 'Escape')     onClose();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [photos.length, onClose]);
+  }, [photos.length, onClose, zoom]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const touchX = useRef<number | null>(null);
-  function onTouchStart(e: React.TouchEvent) { touchX.current = e.touches[0].clientX; }
+  // Touch state refs
+  const touchX   = useRef<number | null>(null);
+  const pinchRef = useRef<number | null>(null);
+  const panStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const lastTap  = useRef(0);
+
+  function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) {
+      pinchRef.current = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY,
+      );
+      return;
+    }
+    const x = e.touches[0].clientX;
+    const y = e.touches[0].clientY;
+    touchX.current = x;
+    panStart.current = { x, y, px: pan.x, py: pan.y };
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2 && pinchRef.current !== null) {
+      const dist = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY,
+      );
+      const ratio = dist / pinchRef.current;
+      setZoom(z => { const nz = Math.min(5, Math.max(1, z * ratio)); if (nz <= 1) setPan({ x: 0, y: 0 }); return nz; });
+      pinchRef.current = dist;
+      return;
+    }
+    if (e.touches.length === 1 && zoom > 1 && panStart.current) {
+      setPan({
+        x: panStart.current.px + e.touches[0].clientX - panStart.current.x,
+        y: panStart.current.py + e.touches[0].clientY - panStart.current.y,
+      });
+    }
+  }
+
   function onTouchEnd(e: React.TouchEvent) {
-    if (touchX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchX.current;
-    if (dx < -50) setCur(i => Math.min(photos.length - 1, i + 1));
-    if (dx >  50) setCur(i => Math.max(0, i - 1));
-    touchX.current = null;
+    pinchRef.current = null;
+    panStart.current = null;
+    if (zoom > 1) { touchX.current = null; return; }
+
+    // Double-tap → zoom 2.5×
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      setZoom(2.5);
+      lastTap.current = 0;
+      touchX.current  = null;
+      return;
+    }
+    lastTap.current = now;
+
+    // Swipe navigation
+    if (touchX.current !== null) {
+      const dx = e.changedTouches[0].clientX - touchX.current;
+      if (dx < -50) setCur(i => Math.min(photos.length - 1, i + 1));
+      if (dx >  50) setCur(i => Math.max(0, i - 1));
+      touchX.current = null;
+    }
+  }
+
+  function onWheel(e: React.WheelEvent) {
+    const scale = e.deltaY > 0 ? 0.85 : 1.15;
+    setZoom(z => { const nz = Math.min(5, Math.max(1, z * scale)); if (nz <= 1) setPan({ x: 0, y: 0 }); return nz; });
+  }
+
+  async function download() {
+    try {
+      const res = await fetch(p.url);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `photo-${p.id}.jpg`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch { /* ignore */ }
   }
 
   const isOwn = p.uploader_id === userId;
+  const zoomed = zoom > 1;
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black flex flex-col select-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-
-      {/* Top bar — fixed overlay */}
+    <div
+      className="fixed inset-0 z-[200] bg-black flex flex-col select-none"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onWheel={onWheel}
+      style={{ touchAction: 'none' }}
+    >
+      {/* Top bar */}
       <div
         className="shrink-0 flex items-center justify-between px-4 py-3"
-        style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
-          paddingTop: 'max(16px, env(safe-area-inset-top))',
-        }}
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)', paddingTop: 'max(16px, env(safe-area-inset-top))' }}
       >
+        <span className="text-white/70 text-sm font-medium">{cur + 1} / {photos.length}</span>
         <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 active:scale-90 transition-transform">
           <X size={18} strokeWidth={2} color="white" />
         </button>
-        <span className="text-white/70 text-sm font-medium">{cur + 1} / {photos.length}</span>
-        {isOwn ? (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            className="w-10 h-10 flex items-center justify-center rounded-full active:scale-90 transition-transform"
-            style={{ background: 'rgba(239,68,68,0.45)', border: '1px solid rgba(239,68,68,0.6)' }}
-          >
-            <X size={16} strokeWidth={2.5} color="#fca5a5" />
-          </button>
-        ) : (
-          <div className="w-10 h-10" />
-        )}
       </div>
 
-      {/* Image area — takes all remaining space */}
-      <div className="flex-1 relative min-h-0">
-        <div className="absolute inset-0 flex items-center justify-center px-1">
+      {/* Image area */}
+      <div className="flex-1 relative min-h-0 overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img key={p.id} src={p.url} alt={p.caption ?? ''} className="max-h-full max-w-full object-contain" draggable={false} />
+          <img
+            key={p.id}
+            src={p.url}
+            alt={p.caption ?? ''}
+            draggable={false}
+            className="max-h-full max-w-full object-contain"
+            style={{
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transition: zoomed ? 'none' : 'transform 0.2s ease',
+              cursor: zoomed ? 'grab' : 'default',
+            }}
+          />
         </div>
 
-        {/* Prev / next arrows */}
-        {cur > 0 && (
+        {/* Zoom level badge — tap to reset */}
+        {zoomed && (
+          <button
+            onClick={resetZoom}
+            className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold text-white"
+            style={{ background: 'rgba(0,0,0,0.55)' }}
+          >
+            {Math.round(zoom * 10) / 10}× · tap to reset
+          </button>
+        )}
+
+        {/* Prev / next — hidden when zoomed */}
+        {!zoomed && cur > 0 && (
           <button onClick={() => setCur(i => i - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 active:scale-90 transition-transform">
             <ChevronLeft size={20} strokeWidth={2} color="white" />
           </button>
         )}
-        {cur < photos.length - 1 && (
+        {!zoomed && cur < photos.length - 1 && (
           <button onClick={() => setCur(i => i + 1)} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 active:scale-90 transition-transform">
             <ChevronRight size={20} strokeWidth={2} color="white" />
           </button>
         )}
 
-        {/* Dot indicator — centred at bottom of image area */}
-        {photos.length > 1 && (
+        {/* Dot indicator */}
+        {photos.length > 1 && !zoomed && (
           <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
             {photos.slice(Math.max(0, cur - 3), Math.min(photos.length, cur + 4)).map((_, i) => {
               const actual = Math.max(0, cur - 3) + i;
@@ -184,16 +274,12 @@ function Lightbox({
         )}
       </div>
 
-      {/* Bottom info bar — always visible, never hidden behind nav */}
+      {/* Bottom info bar */}
       <div
-        className="shrink-0 px-5 pt-4 pb-5 flex items-center justify-between gap-3"
-        style={{
-          background: 'rgba(0,0,0,0.85)',
-          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-        }}
+        className="shrink-0 px-5 pt-4 pb-5 flex items-center gap-3"
+        style={{ background: 'rgba(0,0,0,0.85)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,0.08)' }}
       >
-        <div className="min-w-0">
+        <div className="flex-1 min-w-0">
           <p className="text-white font-semibold text-[15px] leading-snug">{p.uploader_name}</p>
           {p.caption && <p className="text-white/60 text-sm mt-0.5 truncate">{p.caption}</p>}
           {p.uploaded_at && (
@@ -204,12 +290,31 @@ function Lightbox({
             </p>
           )}
         </div>
-        {isOwn && (
-          <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
-            style={{ background: 'rgba(254,146,52,0.2)', color: '#FE9234', border: '1px solid rgba(254,146,52,0.4)' }}>
-            Your photo
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isOwn && (
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+              style={{ background: 'rgba(254,146,52,0.2)', color: '#FE9234', border: '1px solid rgba(254,146,52,0.4)' }}>
+              Your photo
+            </span>
+          )}
+          {isOwn && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-10 h-10 flex items-center justify-center rounded-full active:scale-90 transition-transform"
+              style={{ background: 'rgba(239,68,68,0.25)', border: '1px solid rgba(239,68,68,0.5)' }}
+              title="Delete photo"
+            >
+              <Trash2 size={16} color="#fca5a5" />
+            </button>
+          )}
+          <button
+            onClick={download}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 active:bg-white/25 transition"
+            title="Download photo"
+          >
+            <Download size={18} color="white" />
+          </button>
+        </div>
       </div>
 
       {/* Delete confirm sheet */}
@@ -219,7 +324,7 @@ function Lightbox({
             style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
-                <X size={18} className="text-red-600" />
+                <Trash2 size={18} className="text-red-600" />
               </div>
               <div>
                 <p className="font-bold text-slate-900">Delete this photo?</p>

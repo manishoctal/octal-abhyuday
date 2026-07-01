@@ -103,17 +103,91 @@ export default function MyPhotosClient() {
   const [lightbox, setLightbox] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [lbZoom, setLbZoom] = useState(1);
+  const [lbPan, setLbPan]   = useState({ x: 0, y: 0 });
+  const lbPinch  = useRef<number | null>(null);
+  const lbPanRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const lbTouchX = useRef<number | null>(null);
+  const lbLastTap = useRef(0);
+
+  function lbResetZoom() { setLbZoom(1); setLbPan({ x: 0, y: 0 }); }
+
+  // Reset zoom when photo changes
+  useEffect(() => { lbResetZoom(); }, [lightbox]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keyboard nav for lightbox
   useEffect(() => {
     if (lightbox === null) return;
     const onKey = (e: KeyboardEvent) => {
+      if (lbZoom > 1) { if (e.key === 'Escape') lbResetZoom(); return; }
       if (e.key === 'Escape') setLightbox(null);
       if (e.key === 'ArrowLeft') setLightbox(i => i !== null && i > 0 ? i - 1 : i);
       if (e.key === 'ArrowRight') setLightbox(i => i !== null && i < photos.length - 1 ? i + 1 : i);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lightbox, photos.length]);
+  }, [lightbox, photos.length, lbZoom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function lbTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) {
+      lbPinch.current = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY,
+      );
+      return;
+    }
+    lbTouchX.current = e.touches[0].clientX;
+    lbPanRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, px: lbPan.x, py: lbPan.y };
+  }
+
+  function lbTouchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2 && lbPinch.current !== null) {
+      const dist = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY,
+      );
+      const ratio = dist / lbPinch.current;
+      setLbZoom(z => { const nz = Math.min(5, Math.max(1, z * ratio)); if (nz <= 1) setLbPan({ x: 0, y: 0 }); return nz; });
+      lbPinch.current = dist;
+      return;
+    }
+    if (e.touches.length === 1 && lbZoom > 1 && lbPanRef.current) {
+      setLbPan({
+        x: lbPanRef.current.px + e.touches[0].clientX - lbPanRef.current.x,
+        y: lbPanRef.current.py + e.touches[0].clientY - lbPanRef.current.y,
+      });
+    }
+  }
+
+  function lbTouchEnd(e: React.TouchEvent) {
+    lbPinch.current  = null;
+    lbPanRef.current = null;
+    if (lbZoom > 1) { lbTouchX.current = null; return; }
+    const now = Date.now();
+    if (now - lbLastTap.current < 300) {
+      setLbZoom(2.5); lbLastTap.current = 0; lbTouchX.current = null; return;
+    }
+    lbLastTap.current = now;
+    lbTouchX.current  = null;
+  }
+
+  function lbWheel(e: React.WheelEvent) {
+    const scale = e.deltaY > 0 ? 0.85 : 1.15;
+    setLbZoom(z => { const nz = Math.min(5, Math.max(1, z * scale)); if (nz <= 1) setLbPan({ x: 0, y: 0 }); return nz; });
+  }
+
+  async function downloadPhoto(photo: Photo) {
+    try {
+      const res = await fetch(photo.url);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `event-photo-${photo.id}.jpg`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch { /* ignore */ }
+  }
 
   async function handleFile(file: File) {
     if (preview) URL.revokeObjectURL(preview);
@@ -332,25 +406,35 @@ export default function MyPhotosClient() {
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Your Photos ({photos.length})</p>
             <div className="grid grid-cols-2 gap-2">
               {photos.map((photo, i) => (
-                <motion.button
+                <motion.div
                   key={photo.id}
                   initial={{ opacity: 0, scale: 0.88 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.04, type: 'spring', stiffness: 280 }}
-                  onClick={() => setLightbox(i)}
                   className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 group"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.thumbnail_url ?? photo.url} alt="" loading="lazy"
-                    className="w-full h-full object-cover group-active:scale-105 transition-transform" />
-                  {/* AI badge */}
-                  <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shadow">
+                  <button onClick={() => setLightbox(i)} className="absolute inset-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.thumbnail_url ?? photo.url} alt="" loading="lazy"
+                      className="w-full h-full object-cover group-active:scale-105 transition-transform" />
+                  </button>
+                  {/* AI match badge */}
+                  <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shadow pointer-events-none">
                     <CheckCircle2 size={11} className="text-white" />
                   </div>
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent py-2 px-2">
-                    <p className="text-white text-[10px] font-semibold truncate">{photo.caption || 'Event photo'}</p>
+                  {/* Caption */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent py-2 px-2 flex items-end justify-between pointer-events-none">
+                    <p className="text-white text-[10px] font-semibold truncate flex-1 mr-1">{photo.caption || 'Event photo'}</p>
                   </div>
-                </motion.button>
+                  {/* Download button */}
+                  <button
+                    onClick={e => { e.stopPropagation(); downloadPhoto(photo); }}
+                    className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center active:scale-90 transition-transform"
+                    title="Download"
+                  >
+                    <Download size={13} className="text-white" />
+                  </button>
+                </motion.div>
               ))}
             </div>
           </motion.div>
@@ -364,36 +448,62 @@ export default function MyPhotosClient() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[999] bg-black/95 flex flex-col"
-            onClick={() => setLightbox(null)}
+            className="fixed inset-0 z-[999] bg-black flex flex-col select-none"
+            style={{ touchAction: 'none' }}
+            onTouchStart={lbTouchStart}
+            onTouchMove={lbTouchMove}
+            onTouchEnd={lbTouchEnd}
+            onWheel={lbWheel}
           >
-            <div className="flex items-center justify-between px-4 py-3 shrink-0" onClick={e => e.stopPropagation()}>
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 py-3 shrink-0">
               <p className="text-white/60 text-sm">{lightbox + 1} / {photos.length}</p>
               <button onClick={() => setLightbox(null)} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
                 <X size={18} className="text-white" />
               </button>
             </div>
-            <div className="flex-1 flex items-center justify-center px-6 min-h-0" onClick={e => e.stopPropagation()}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photos[lightbox]?.url} alt="" className="max-h-full max-w-full object-contain rounded-xl" />
+
+            {/* Image area */}
+            <div className="flex-1 relative min-h-0 overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center px-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photos[lightbox]?.url}
+                  alt=""
+                  draggable={false}
+                  className="max-h-full max-w-full object-contain"
+                  style={{
+                    transform: `scale(${lbZoom}) translate(${lbPan.x / lbZoom}px, ${lbPan.y / lbZoom}px)`,
+                    transition: lbZoom > 1 ? 'none' : 'transform 0.2s ease',
+                    cursor: lbZoom > 1 ? 'grab' : 'default',
+                  }}
+                />
+              </div>
+              {/* Zoom badge */}
+              {lbZoom > 1 && (
+                <button
+                  onClick={lbResetZoom}
+                  className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold text-white"
+                  style={{ background: 'rgba(0,0,0,0.55)' }}
+                >
+                  {Math.round(lbZoom * 10) / 10}× · tap to reset
+                </button>
+              )}
             </div>
-            <div className="flex items-center justify-center gap-3 py-4 shrink-0" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setLightbox(i => i !== null && i > 0 ? i - 1 : i)}
+
+            {/* Bottom controls */}
+            <div className="flex items-center justify-center gap-3 py-4 shrink-0">
+              <button onClick={() => { lbResetZoom(); setLightbox(i => i !== null && i > 0 ? i - 1 : i); }}
                 disabled={lightbox === 0}
                 className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center disabled:opacity-30 transition">
                 <ChevronLeft size={22} className="text-white" />
               </button>
-              <button onClick={async () => {
-                  const p = photos[lightbox];
-                  const res = await fetch(p.url);
-                  const blob = await res.blob();
-                  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-                  a.download = `event-photo-${p.id}.jpg`; a.click(); URL.revokeObjectURL(a.href);
-                }}
+              <button
+                onClick={() => downloadPhoto(photos[lightbox])}
                 className="px-5 py-2 rounded-xl bg-white text-slate-900 text-sm font-bold flex items-center gap-1.5 hover:bg-white/90 transition">
                 <Download size={14} /> Save
               </button>
-              <button onClick={() => setLightbox(i => i !== null && i < photos.length - 1 ? i + 1 : i)}
+              <button onClick={() => { lbResetZoom(); setLightbox(i => i !== null && i < photos.length - 1 ? i + 1 : i); }}
                 disabled={lightbox === photos.length - 1}
                 className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center disabled:opacity-30 transition">
                 <ChevronRight size={22} className="text-white" />

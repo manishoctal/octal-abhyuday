@@ -20,11 +20,14 @@ export async function POST(req: Request) {
   const zip = new JSZip();
   const folder = zip.folder('matching-photos')!;
 
+  const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+
   const results = await Promise.allSettled(
     photoIds.map(async (id: number) => {
       const photo = getPhotoById(id);
       if (!photo) return;
-      const res = await fetch(photo.url, { signal: AbortSignal.timeout(15000) });
+      const url = photo.url.startsWith('http') ? photo.url : `${base}${photo.url}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = await res.arrayBuffer();
       const ext = photo.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
