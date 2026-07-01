@@ -648,6 +648,7 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
   const [deletingAll, setDeletingAll]     = useState(false);
   const [faceFilterIds, setFaceFilterIds] = useState<number[] | null>(null);
   const [retagging,     setRetagging]     = useState<number | null>(null);
+  const [statusFilter,  setStatusFilter]  = useState<'all' | 'failed-tag' | 'no-thumb'>('all');
 
   async function refresh() {
     const d = await fetch('/api/photos?all=1').then(r => r.json());
@@ -699,12 +700,18 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
     await refresh();
   }
 
-  const visible = photos.filter(p => p.approved !== -1);
-  const hidden  = photos.filter(p => p.approved === -1);
+  const visible  = photos.filter(p => p.approved !== -1);
+  const hidden   = photos.filter(p => p.approved === -1);
   const baseList = tab === 'visible' ? visible : hidden;
-  const tabList = faceFilterIds
-    ? baseList.filter(p => faceFilterIds.includes(p.id))
-    : baseList;
+  const faceFiltered = faceFilterIds ? baseList.filter(p => faceFilterIds.includes(p.id)) : baseList;
+  const tabList = statusFilter === 'failed-tag'
+    ? faceFiltered.filter(p => p.face_tag_status === 'failed')
+    : statusFilter === 'no-thumb'
+      ? faceFiltered.filter(p => !p.thumbnail_url)
+      : faceFiltered;
+
+  const failedCount  = baseList.filter(p => p.face_tag_status === 'failed').length;
+  const noThumbCount = baseList.filter(p => !p.thumbnail_url).length;
 
   return (
     <>
@@ -793,7 +800,7 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
         {/* ── Right: AI search + gallery ────────────────── */}
         <div className="space-y-4">
           {/* AI Face Search (full width, above gallery) */}
-          <FaceFinder onResults={ids => { setFaceFilterIds(ids); if (ids) setTab('visible'); }} />
+          <FaceFinder onResults={ids => { setFaceFilterIds(ids); if (ids) { setTab('visible'); setStatusFilter('all'); } }} />
 
           {/* Toolbar */}
           <div className="flex items-center gap-3 flex-wrap">
@@ -801,7 +808,7 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
               {(['visible', 'hidden'] as const).map(t => (
                 <button
                   key={t}
-                  onClick={() => { setTab(t); setFaceFilterIds(null); }}
+                  onClick={() => { setTab(t); setFaceFilterIds(null); setStatusFilter('all'); }}
                   className={`px-4 py-2 text-sm font-bold transition-colors ${
                     tab === t ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                   }`}
@@ -815,6 +822,34 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
                 </button>
               ))}
             </div>
+
+            {/* Status filter chips */}
+            {failedCount > 0 && (
+              <button
+                onClick={() => setStatusFilter(f => f === 'failed-tag' ? 'all' : 'failed-tag')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                  statusFilter === 'failed-tag'
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                }`}
+              >
+                <AlertTriangle size={12} />
+                {failedCount} Tag Failed
+              </button>
+            )}
+            {noThumbCount > 0 && (
+              <button
+                onClick={() => setStatusFilter(f => f === 'no-thumb' ? 'all' : 'no-thumb')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                  statusFilter === 'no-thumb'
+                    ? 'bg-amber-500 text-white border-amber-500'
+                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                }`}
+              >
+                <Sparkles size={12} />
+                {noThumbCount} No Thumb
+              </button>
+            )}
 
             {/* Active face filter banner */}
             {faceFilterIds && (
@@ -839,7 +874,25 @@ export default function AdminPhotosModule({ initial, useS3 }: { initial: Photo[]
           {/* Empty state */}
           {tabList.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-100">
-              {faceFilterIds ? (
+              {statusFilter === 'failed-tag' ? (
+                <>
+                  <span className="text-5xl mb-4">✅</span>
+                  <p className="font-bold text-slate-600">No failed tags</p>
+                  <p className="text-sm mt-1">All photos tagged successfully</p>
+                  <button onClick={() => setStatusFilter('all')} className="mt-4 text-sm font-semibold text-red-600 hover:underline flex items-center gap-1">
+                    <FilterX size={13} /> Clear filter
+                  </button>
+                </>
+              ) : statusFilter === 'no-thumb' ? (
+                <>
+                  <span className="text-5xl mb-4">✅</span>
+                  <p className="font-bold text-slate-600">All thumbnails generated</p>
+                  <p className="text-sm mt-1">Every photo has a thumbnail</p>
+                  <button onClick={() => setStatusFilter('all')} className="mt-4 text-sm font-semibold text-amber-600 hover:underline flex items-center gap-1">
+                    <FilterX size={13} /> Clear filter
+                  </button>
+                </>
+              ) : faceFilterIds ? (
                 <>
                   <span className="text-5xl mb-4">🔍</span>
                   <p className="font-bold text-slate-600">No gallery matches found</p>
