@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
     console.log(`[face-resize] photo ${id}: ${origKB} KB → ${Math.round(resized.length / 1024)} KB`);
 
-    return new Response(resized, {
+    return new Response(new Uint8Array(resized), {
       headers: {
         'Content-Type': 'image/jpeg',
         'Cache-Control': 'public, max-age=86400',
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
     });
   } catch {
     // Sharp unavailable — serve original unchanged
-    return new Response(buf, {
+    return new Response(new Uint8Array(buf), {
       headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' },
     });
   }
