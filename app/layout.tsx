@@ -8,12 +8,27 @@ import './globals.css';
 
 export function generateMetadata(): Metadata {
   const eventName = getAppState().event_name;
+  const title = `${eventName} — Octal IT Solution LLP`;
+  const description = `Your event companion for ${eventName} — schedule, voting, Q&A, gallery, and more.`;
   return {
-    title: `${eventName} — Octal IT Solution LLP`,
-    description: `Your event companion for ${eventName} — schedule, voting, Q&A, gallery, and more.`,
+    title,
+    description,
     manifest: '/manifest.json',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: eventName },
-    icons: { icon: '/icons/icon-192.svg', apple: '/icons/icon-192.svg' },
+    icons: { icon: '/icons/icon-192.png', apple: '/icons/icon-192.png' },
+    openGraph: {
+      title,
+      description,
+      siteName: 'Octal IT Solution LLP',
+      type: 'website',
+      images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/opengraph-image'],
+    },
   };
 }
 
