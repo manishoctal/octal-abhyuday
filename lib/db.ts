@@ -452,6 +452,17 @@ function syncCandidatePhoto(email: string | null | undefined, photoUrl: string |
   db.prepare('UPDATE candidates SET image_url = ? WHERE email = ?').run(photoUrl, email.toLowerCase());
 }
 
+/** Keep candidates.gender and votes.gender in sync when employee gender is corrected. */
+function syncCandidateGender(email: string | null | undefined, gender: 'male' | 'female' | null) {
+  if (!email || !gender) return;
+  const emailLower = email.toLowerCase();
+  const candidate = db.prepare('SELECT id, gender FROM candidates WHERE email = ?').get(emailLower) as
+    | { id: number; gender: string | null } | undefined;
+  if (!candidate || candidate.gender === gender) return;
+  db.prepare('UPDATE candidates SET gender = ? WHERE id = ?').run(gender, candidate.id);
+  db.prepare('UPDATE votes SET gender = ? WHERE candidate_id = ?').run(gender, candidate.id);
+}
+
 export function updateUserProfile(userId: number, department: string | null, profilePhotoUrl: string | null) {
   db.prepare('UPDATE users SET department = ?, profile_photo_url = ? WHERE id = ?').run(
     department, profilePhotoUrl, userId
@@ -1369,6 +1380,7 @@ export function updateEmployee(
     `UPDATE employees SET employee_code=?, name=?, email=?, department=?, gender=?, profile_photo_url=?, is_active=?, exclude_from_voting=? WHERE id=?`
   ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl, isActive, excludeFromVoting, id);
   syncCandidatePhoto(email, profilePhotoUrl);
+  syncCandidateGender(email, gender);
 }
 
 export function deleteEmployee(id: number) {

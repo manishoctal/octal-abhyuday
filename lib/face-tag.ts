@@ -55,7 +55,10 @@ export async function tagPhotoById(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url: photoUrl }),
   });
-  if (!res.ok) throw new Error(`face-service ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`face-service ${res.status}: ${body.slice(0, 300)}`);
+  }
 
   const { embeddings, face_count } = (await res.json()) as {
     embeddings: number[][];

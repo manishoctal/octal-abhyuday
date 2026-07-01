@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import BottomNav from '@/components/BottomNav';
+import BfcacheGuard from '@/components/BfcacheGuard';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -8,6 +9,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
+      <BfcacheGuard />
       {children}
       <BottomNav isAdmin={session.isAdmin} />
     </>

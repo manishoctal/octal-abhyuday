@@ -177,7 +177,7 @@ function ProcessingPanel({ onRefresh }: { onRefresh?: () => void }) {
       if (!res.ok) { notify(`Error: ${d.error}`, false); return; }
       const msg = d.processed === 0
         ? 'All photos already tagged.'
-        : `Done — ${d.tagged} match${d.tagged !== 1 ? 'es' : ''} in ${d.processed} photo${d.processed !== 1 ? 's' : ''}${d.failed ? ` · ${d.failed} still failed` : ''}`;
+        : `Done — ${d.tagged} match${d.tagged !== 1 ? 'es' : ''} in ${d.processed} photo${d.processed !== 1 ? 's' : ''}${d.failed ? ` · ${d.failed} still failed` : ''}${d.lastError ? ` — ${d.lastError}` : ''}`;
       notify(msg, d.failed === 0);
       await Promise.all([loadStats(), onRefresh?.()]);
     } finally { setPendingLoading(false); }

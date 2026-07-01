@@ -24,9 +24,11 @@ export async function POST(req: Request) {
     try {
       const { tagged, faces } = await tagPhotoById(photoId, base);
       return NextResponse.json({ ok: true, tagged, faces });
-    } catch {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[tag-pending] single photo failed:', msg);
       setPhotoTagStatus(photoId, 'failed');
-      return NextResponse.json({ error: 'Face service unavailable' }, { status: 503 });
+      return NextResponse.json({ error: msg }, { status: 503 });
     }
   }
 
@@ -35,15 +37,19 @@ export async function POST(req: Request) {
   if (!photos.length) return NextResponse.json({ ok: true, processed: 0, tagged: 0, failed: 0 });
 
   let tagged = 0, failed = 0;
+  let lastError = '';
   for (const photo of photos) {
     try {
       const result = await tagPhotoById(photo.id, base);
       tagged += result.tagged;
-    } catch {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!lastError) lastError = msg;
+      console.error(`[tag-pending] photo ${photo.id} failed:`, msg);
       setPhotoTagStatus(photo.id, 'failed');
       failed++;
     }
   }
 
-  return NextResponse.json({ ok: true, processed: photos.length, tagged, failed });
+  return NextResponse.json({ ok: true, processed: photos.length, tagged, failed, lastError: lastError || undefined });
 }
