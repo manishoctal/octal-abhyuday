@@ -13,8 +13,12 @@ export async function GET(req: Request) {
 
   const state = getAppState();
   const round = state.voting_round;
-  const male   = listCandidates('male',   { round, finalistsOnly: round > 1 });
-  const female = listCandidates('female', { round, finalistsOnly: round > 1 });
+  // When a round hasn't started yet and we're past Round 1, show the previous round's
+  // ranked results so the admin can see the original vote counts before re-promoting.
+  const isRedo = round > 1 && state.voting_state === 'not_started';
+  const displayRound = isRedo ? round - 1 : round;
+  const male   = listCandidates('male',   { round: displayRound, finalistsOnly: displayRound > 1 });
+  const female = listCandidates('female', { round: displayRound, finalistsOnly: displayRound > 1 });
 
   if (new URL(req.url).searchParams.get('format') === 'csv') {
     const esc = (v: string | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -49,7 +53,7 @@ export async function POST(req: Request) {
       { status: 409 }
     );
   }
-  if (state.voting_state !== 'ended') {
+  if (state.voting_state !== 'ended' && state.voting_state !== 'not_started') {
     return NextResponse.json(
       { error: 'End current round voting before promoting candidates' },
       { status: 409 }
@@ -63,8 +67,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Counts must be between 1 and 200' }, { status: 400 });
   }
 
-  const nextRound = state.voting_round + 1;
-  const promoted = promoteTopByVotes(m, f, state.voting_round, nextRound);
+  // Re-do case: round hasn't started yet — re-promote from the previous round's votes,
+  // keeping the current round number (no advancement).
+  const isRedo = state.voting_state === 'not_started' && state.voting_round > 1;
+  const fromRound = isRedo ? state.voting_round - 1 : state.voting_round;
+  const nextRound = isRedo ? state.voting_round : state.voting_round + 1;
+  const promoted = promoteTopByVotes(m, f, fromRound, nextRound);
   broadcast('state');
   sendPushToAll(
     `🎖️ Round ${nextRound} is now open!`,

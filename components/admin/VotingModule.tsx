@@ -208,7 +208,11 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
 
         {/* Promote panel */}
         {!isFinalRound && (vs === 'ended' || round > 1) && (
-          <RoundResults mode={vs === 'ended' ? 'promote' : 'view'} notify={notify} onPromoted={() => mutate()} />
+          <RoundResults
+            mode={vs === 'ended' || (vs === 'not_started' && round > 1) ? 'promote' : 'view'}
+            notify={notify}
+            onPromoted={() => mutate()}
+          />
         )}
         {isFinalRound && (
           <RoundResults mode="view" notify={notify} onPromoted={() => mutate()} />
@@ -239,22 +243,26 @@ function RoundResults({
   onPromoted: () => void;
 }) {
   const { data } = useSWR<RoundResultsResponse>('/api/admin/round1-results', fetcher);
-  const [maleCount, setMaleCount] = useState(10);
-  const [femaleCount, setFemaleCount] = useState(10);
+  const [maleCount, setMaleCount] = useState(15);
+  const [femaleCount, setFemaleCount] = useState(15);
   const [busy, setBusy] = useState(false);
 
   if (!data) return <Spinner />;
 
   const { state } = data;
   const round = state.voting_round;
-  const nextRound = round + 1;
   const isFinalRound = round === state.total_rounds;
+  // Re-do: round hasn't started yet — API returns the previous round's data so admin can re-choose the cutoff.
+  const isRedo = mode === 'promote' && state.voting_state === 'not_started' && round > 1;
+  const displayRound = isRedo ? round - 1 : round;
+  const nextRound = isRedo ? round : round + 1;
 
   async function promote() {
+    const confirmMsg = isRedo
+      ? `Re-select the top ${maleCount} male + ${femaleCount} female finalists for Round ${round} (by Round ${displayRound} votes)? This replaces the current selection.`
+      : `Promote the top ${maleCount} male + top ${femaleCount} female to Round ${nextRound}${nextRound === state.total_rounds ? ' (Grand Finale)' : ''}? Ties at the cutoff are included.`;
     if (
-      !window.confirm(
-        `Promote the top ${maleCount} male + top ${femaleCount} female to Round ${nextRound}${nextRound === state.total_rounds ? ' (Grand Finale)' : ''}? Ties at the cutoff are included.`
-      )
+      !window.confirm(confirmMsg)
     )
       return;
     setBusy(true);
@@ -316,13 +324,19 @@ function RoundResults({
     </div>
   );
 
-  const roundLabel = isFinalRound ? `Round ${round} (Grand Finale)` : `Round ${round}`;
+  const roundLabel = isFinalRound
+    ? `Round ${round} (Grand Finale)`
+    : isRedo
+      ? `Round ${displayRound} results`
+      : `Round ${round}`;
 
   return (
     <div className={`bg-white rounded-2xl p-5 ${mode === 'promote' ? 'border-2 border-brand-200' : 'border border-slate-200'}`}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-extrabold text-slate-900">
-          📋 {roundLabel} results {mode === 'view' && !isFinalRound && <span className="text-slate-400 font-semibold">(reference)</span>}
+          📋 {roundLabel} results
+          {isRedo && <span className="ml-2 text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">re-selecting Round {round} finalists</span>}
+          {mode === 'view' && !isFinalRound && !isRedo && <span className="text-slate-400 font-semibold">(reference)</span>}
         </h3>
         <a
           href="/api/admin/round1-results?format=csv"
@@ -334,10 +348,12 @@ function RoundResults({
       </div>
       <p className="text-xs text-slate-500 mt-1 mb-4">
         {mode === 'promote'
-          ? `Ranked by votes. Choose how many advance to Round ${nextRound}${nextRound === state.total_rounds ? ' (Grand Finale)' : ''} — highlighted rows advance (ties at the cutoff are included).`
+          ? isRedo
+            ? `Round ${displayRound} results — adjust the cutoff and click the button to replace the Round ${round} finalist selection.`
+            : `Ranked by votes. Choose how many advance to Round ${nextRound}${nextRound === state.total_rounds ? ' (Grand Finale)' : ''} — highlighted rows advance (ties at the cutoff are included).`
           : isFinalRound
             ? 'Final standings for this round.'
-            : `Standings — highlighted rows were promoted to Round ${nextRound}.`}
+            : `Standings — highlighted rows were promoted from Round ${round - 1} to Round ${round}.`}
       </p>
 
       {mode === 'promote' && !isFinalRound && (
@@ -370,8 +386,10 @@ function RoundResults({
             className="flex-1 min-w-[200px] rounded-xl py-3 px-4 font-black text-white bg-gradient-to-r from-brand-600 to-purple-600 hover:opacity-95 disabled:opacity-40"
           >
             {busy
-              ? 'Promoting…'
-              : `🚀 Promote top ${maleCount} + ${femaleCount} to Round ${nextRound}${nextRound === state.total_rounds ? ' (Finale)' : ''}`}
+              ? (isRedo ? 'Updating…' : 'Promoting…')
+              : isRedo
+                ? `🔄 Update — top ${maleCount} male + ${femaleCount} female for Round ${round}`
+                : `🚀 Promote top ${maleCount} + ${femaleCount} to Round ${nextRound}${nextRound === state.total_rounds ? ' (Finale)' : ''}`}
           </button>
         </div>
       )}

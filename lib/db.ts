@@ -452,6 +452,20 @@ function syncCandidatePhoto(email: string | null | undefined, photoUrl: string |
   db.prepare('UPDATE candidates SET image_url = ? WHERE email = ?').run(photoUrl, email.toLowerCase());
 }
 
+/** Keep candidates.name in sync when an employee name is corrected. */
+function syncCandidateName(email: string | null | undefined, name: string | null) {
+  if (!email || !name) return;
+  db.prepare('UPDATE candidates SET name = ? WHERE email = ?').run(name, email.toLowerCase());
+}
+
+/** Keep candidates.email in sync when an employee email is corrected. */
+function syncCandidateEmail(oldEmail: string | null | undefined, newEmail: string | null | undefined) {
+  if (!oldEmail || !newEmail || oldEmail.toLowerCase() === newEmail.toLowerCase()) return;
+  db.prepare('UPDATE candidates SET email = ? WHERE email = ?').run(
+    newEmail.toLowerCase(), oldEmail.toLowerCase()
+  );
+}
+
 /** Keep candidates.gender and votes.gender in sync when employee gender is corrected. */
 function syncCandidateGender(email: string | null | undefined, gender: 'male' | 'female' | null) {
   if (!email || !gender) return;
@@ -1368,6 +1382,8 @@ export function createEmployee(
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl);
   syncCandidatePhoto(email, profilePhotoUrl);
+  syncCandidateName(email, name);
+  syncCandidateGender(email, gender);
   return db.prepare('SELECT * FROM employees WHERE id = ?').get(r.lastInsertRowid) as Employee;
 }
 
@@ -1376,10 +1392,13 @@ export function updateEmployee(
   department: string | null, gender: 'male' | 'female' | null,
   profilePhotoUrl: string | null, isActive: number, excludeFromVoting = 0
 ) {
+  const old = db.prepare('SELECT email FROM employees WHERE id = ?').get(id) as { email: string } | undefined;
   db.prepare(
     `UPDATE employees SET employee_code=?, name=?, email=?, department=?, gender=?, profile_photo_url=?, is_active=?, exclude_from_voting=? WHERE id=?`
   ).run(employeeCode, name, email.toLowerCase(), department, gender, profilePhotoUrl, isActive, excludeFromVoting, id);
+  syncCandidateEmail(old?.email, email);
   syncCandidatePhoto(email, profilePhotoUrl);
+  syncCandidateName(email, name);
   syncCandidateGender(email, gender);
 }
 
