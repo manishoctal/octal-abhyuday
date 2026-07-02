@@ -16,7 +16,7 @@ export async function GET() {
   // page and handles WAL pages automatically, producing a consistent snapshot.
   const tmp = path.join(os.tmpdir(), `vote-export-${Date.now()}.db`);
   try {
-    (db as any).backup(tmp);
+    await (db as any).backup(tmp);
 
     const buf = fs.readFileSync(tmp);
     const ts  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
