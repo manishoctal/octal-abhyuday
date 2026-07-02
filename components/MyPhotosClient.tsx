@@ -101,7 +101,13 @@ export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearc
   const [photos, setPhotos]     = useState<Photo[]>([]);
   const [errorMsg, setError]    = useState('');
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [comingSoonToast, setComingSoonToast] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleDisabledClick() {
+    setComingSoonToast(true);
+    setTimeout(() => setComingSoonToast(false), 3000);
+  }
 
   const [lbZoom, setLbZoom] = useState(1);
   const [lbPan, setLbPan]   = useState({ x: 0, y: 0 });
@@ -287,19 +293,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearc
     }
   }
 
-  if (!faceSearchEnabled) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center space-y-3 px-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <ScanFace size={28} className="text-slate-300" />
-        </div>
-        <p className="font-bold text-slate-700 text-base">AI Search Unavailable</p>
-        <p className="text-sm text-slate-400 leading-relaxed">
-          Face search is disabled during the event to keep things running smoothly. Check back after the event!
-        </p>
-      </div>
-    );
-  }
+  // faceSearchEnabled=false: show the page but with a disabled CTA and toast
 
   return (
     <div className="space-y-4 pb-24">
@@ -332,14 +326,33 @@ export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearc
                     <span className="font-bold text-slate-600">event photos</span> to find the ones you appear in — instantly.
                   </p>
                 </div>
-                <button
-                  onClick={takeSelfie}
-                  className="w-full py-4 rounded-2xl font-black text-white text-base flex items-center justify-center gap-2"
-                  style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', boxShadow: '0 8px 24px rgba(255,122,0,0.3)' }}
-                >
-                  <Camera size={20} /> Take Selfie
-                </button>
-                <p className="text-xs text-slate-400">Your selfie is used only for matching — never stored</p>
+                {faceSearchEnabled ? (
+                  <>
+                    <button
+                      onClick={takeSelfie}
+                      className="w-full py-4 rounded-2xl font-black text-white text-base flex items-center justify-center gap-2"
+                      style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', boxShadow: '0 8px 24px rgba(255,122,0,0.3)' }}
+                    >
+                      <Camera size={20} /> Take Selfie
+                    </button>
+                    <p className="text-xs text-slate-400">Your selfie is used only for matching — never stored</p>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleDisabledClick}
+                      className="w-full py-4 rounded-2xl font-black text-slate-400 text-base flex items-center justify-center gap-2 bg-slate-100"
+                    >
+                      <Camera size={20} /> Take Selfie
+                    </button>
+                    <p className="text-xs text-amber-500 font-semibold text-center">This feature will be enabled soon ✨</p>
+                    {comingSoonToast && (
+                      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-xl max-w-[92vw] text-center">
+                        AI photo search will be enabled soon ✨
+                      </div>
+                    )}
+                  </>
+                )}
               </motion.div>
             )}
 

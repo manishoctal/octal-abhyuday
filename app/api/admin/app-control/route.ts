@@ -40,9 +40,10 @@ export async function GET() {
     static_otp_code: process.env.OTP_CODE ?? '1234',
   };
 
-  const faceSearchEnabled = getSetting('face_search_enabled') !== '0';
+  const faceSearchEnabled  = getSetting('face_search_enabled')   !== '0';
+  const uploadEnabled      = getSetting('photo_upload_enabled')  !== '0';
 
-  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig, faceSearchEnabled });
+  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig, faceSearchEnabled, uploadEnabled });
 }
 
 export async function POST(req: Request) {
@@ -60,6 +61,12 @@ export async function POST(req: Request) {
   // Toggle AI face search
   if ('face_search_enabled' in body) {
     setSetting('face_search_enabled', body.face_search_enabled ? '1' : '0');
+    return NextResponse.json({ ok: true });
+  }
+
+  // Toggle photo upload
+  if ('photo_upload_enabled' in body) {
+    setSetting('photo_upload_enabled', body.photo_upload_enabled ? '1' : '0');
     return NextResponse.json({ ok: true });
   }
 

@@ -116,11 +116,13 @@ function CandidateBar({
   rank,
   maxVotes,
   color,
+  hideVotes = false,
 }: {
   candidate: CandidateWithVotes;
   rank: number;
   maxVotes: number;
   color: string;
+  hideVotes?: boolean;
 }) {
   const pct = maxVotes > 0 ? (candidate.vote_count / maxVotes) * 100 : 0;
   const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : String(rank);
@@ -133,19 +135,21 @@ function CandidateBar({
       animate={{ opacity: 1, x: 0 }}
       transition={{ type: 'spring', stiffness: 260, damping: 24, delay: rank * 0.06 }}
       className={`relative rounded-2xl border-2 px-5 py-3.5 overflow-hidden ${
-        rank === 1 ? 'border-amber-400/70 bg-amber-400/8' : 'border-white/10 bg-white/5'
+        !hideVotes && rank === 1 ? 'border-amber-400/70 bg-amber-400/8' : 'border-white/10 bg-white/5'
       }`}
     >
-      {/* animated fill bar */}
-      <motion.div
-        animate={{ width: `${pct}%` }}
-        transition={{ type: 'spring', stiffness: 60, damping: 18 }}
-        className="absolute inset-y-0 left-0 rounded-2xl"
-        style={{ background: rank === 1 ? 'rgba(251,191,36,0.18)' : `${color}22` }}
-      />
+      {/* animated fill bar — hidden in secret mode */}
+      {!hideVotes && (
+        <motion.div
+          animate={{ width: `${pct}%` }}
+          transition={{ type: 'spring', stiffness: 60, damping: 18 }}
+          className="absolute inset-y-0 left-0 rounded-2xl"
+          style={{ background: rank === 1 ? 'rgba(251,191,36,0.18)' : `${color}22` }}
+        />
+      )}
       <div className="relative flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-2xl w-8 text-center shrink-0">{medal}</span>
+          {!hideVotes && <span className="text-2xl w-8 text-center shrink-0">{medal}</span>}
           {candidate.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -167,12 +171,14 @@ function CandidateBar({
             </p>
           </div>
         </div>
-        <span className="shrink-0 text-xl sm:text-2xl font-black text-amber-300">
-          {candidate.vote_count}
-          <span className="text-sm font-bold text-slate-400 ml-1">
-            {candidate.vote_count === 1 ? 'vote' : 'votes'}
+        {!hideVotes && (
+          <span className="shrink-0 text-xl sm:text-2xl font-black text-amber-300">
+            {candidate.vote_count}
+            <span className="text-sm font-bold text-slate-400 ml-1">
+              {candidate.vote_count === 1 ? 'vote' : 'votes'}
+            </span>
           </span>
-        </span>
+        )}
       </div>
     </motion.div>
   );
@@ -183,13 +189,18 @@ function GenderColumn({
   emoji,
   candidates,
   color,
+  hideVotes = false,
 }: {
   title: string;
   emoji: string;
   candidates: CandidateWithVotes[];
   color: string;
+  hideVotes?: boolean;
 }) {
   const maxVotes = Math.max(1, ...candidates.map((c) => c.vote_count));
+  const displayed = hideVotes
+    ? [...candidates].sort((a, b) => a.name.localeCompare(b.name))
+    : candidates;
 
   return (
     <div className="flex-1 min-w-0">
@@ -197,19 +208,25 @@ function GenderColumn({
         <span>{emoji}</span>
         <span style={{ color }}>{title}</span>
       </h2>
-      {candidates.length === 0 ? (
+      {displayed.length === 0 ? (
         <p className="text-center text-slate-500 font-semibold py-12">No votes yet</p>
       ) : (
         <motion.div layout className="space-y-2.5">
           <AnimatePresence>
-            {candidates.map((c, i) => (
-              <CandidateBar key={c.id} candidate={c} rank={i + 1} maxVotes={maxVotes} color={color} />
+            {displayed.map((c, i) => (
+              <CandidateBar key={c.id} candidate={c} rank={i + 1} maxVotes={maxVotes} color={color} hideVotes={hideVotes} />
             ))}
           </AnimatePresence>
         </motion.div>
       )}
     </div>
   );
+}
+
+interface VoteFlash {
+  key: string;
+  candidate: CandidateWithVotes;
+  delta: number;
 }
 
 export default function VotingStageClient({ eventName }: { eventName: string }) {
@@ -226,6 +243,31 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
   const isFinalRound     = round === totalRounds;
   const topMale   = data?.topMale   ?? [];
   const topFemale = data?.topFemale ?? [];
+
+  // Vote flash toasts — detect count changes between refreshes
+  const prevCounts = useRef<Map<number, number>>(new Map());
+  const flashSeq = useRef(0);
+  const [flashes, setFlashes] = useState<VoteFlash[]>([]);
+
+  useEffect(() => {
+    if (!data) return;
+    const all = [...data.topMale, ...data.topFemale];
+    const newFlashes: VoteFlash[] = [];
+    for (const c of all) {
+      const prev = prevCounts.current.get(c.id) ?? 0;
+      const delta = c.vote_count - prev;
+      if (delta !== 0) {
+        newFlashes.push({ key: `${c.id}-${++flashSeq.current}`, candidate: c, delta });
+      }
+      prevCounts.current.set(c.id, c.vote_count);
+    }
+    if (newFlashes.length === 0) return;
+    setFlashes(f => [...f, ...newFlashes]);
+    const timer = setTimeout(() => {
+      setFlashes(f => f.filter(fl => !newFlashes.find(n => n.key === fl.key)));
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [data]);
   const stats     = data?.stats;
 
   const winners = (awardsData?.categories ?? []).filter((c: { winner?: unknown }) => c.winner);
@@ -392,6 +434,41 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Vote flash — centered, floats up and fades */}
+      <div className="fixed inset-0 z-30 pointer-events-none flex items-center justify-center">
+        <AnimatePresence>
+          {flashes.map(fl => (
+            <motion.div
+              key={fl.key}
+              variants={{
+                hidden:  { opacity: 0, y: 20, scale: 0.7 },
+                visible: { opacity: 1, y: 0,  scale: 1,   transition: { type: 'spring', stiffness: 400, damping: 22 } },
+                gone:    { opacity: 0, y: -200, scale: 0.85, transition: { duration: 1.6, ease: [0.25, 0.1, 0.25, 1] } },
+              }}
+              initial="hidden"
+              animate="visible"
+              exit="gone"
+              className="absolute flex flex-col items-center gap-3"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={fl.candidate.image_url}
+                alt=""
+                className="w-24 h-24 rounded-full object-cover ring-4 ring-white/30 shadow-2xl"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(fl.candidate.name)}`;
+                }}
+              />
+              <p className="text-white font-extrabold text-xl drop-shadow-lg">{fl.candidate.name}</p>
+              <span className={`text-7xl font-black drop-shadow-2xl leading-none ${fl.delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {fl.delta > 0 ? `+${fl.delta}` : fl.delta}
+              </span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {SPARKLES.map((s, i) => (
         <span key={i} className="sparkle" style={{ top: s.top, left: s.left, animationDelay: s.delay }} />
       ))}
@@ -411,7 +488,7 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
           </div>
           {stats && (
             <p className="mt-2 text-sm text-slate-500 font-semibold">
-              {stats.totalVotes.toLocaleString()} votes cast &nbsp;·&nbsp; {stats.voters} of {stats.totalUsers} participants
+              {stats.totalVotes.toLocaleString()} votes cast &nbsp;·&nbsp; {stats.voters} of {stats.totalUsers} voters
             </p>
           )}
         </div>
@@ -421,11 +498,11 @@ export default function VotingStageClient({ eventName }: { eventName: string }) 
           <WinnersDisplay male={topMale[0]} female={topFemale[0]} />
         ) : (
           <div className="flex-1 flex flex-col sm:flex-row gap-8 sm:gap-10">
-            <GenderColumn title="Mr. ABHYUDAY" emoji="👨" candidates={topMale}   color="#60A5FA" />
+            <GenderColumn title="Mr. ABHYUDAY" emoji="👨" candidates={topMale}   color="#60A5FA" hideVotes={!resultsAnnounced} />
             {/* Mobile: horizontal rule; Desktop: vertical rule */}
             <div className="sm:hidden h-px w-full rounded-full" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent)' }} />
             <div className="hidden sm:block w-px self-stretch rounded-full" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.3) 20%, rgba(255,255,255,0.3) 80%, transparent)' }} />
-            <GenderColumn title="Ms. ABHYUDAY" emoji="👩" candidates={topFemale} color="#F472B6" />
+            <GenderColumn title="Ms. ABHYUDAY" emoji="👩" candidates={topFemale} color="#F472B6" hideVotes={!resultsAnnounced} />
           </div>
         )}
 

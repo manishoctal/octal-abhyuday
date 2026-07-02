@@ -164,6 +164,21 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
           )}
         </div>
 
+        {/* Show / hide candidates for employees (preview before voting opens) */}
+        {vs === 'not_started' && (
+          <button
+            onClick={() => doAction('toggle_preview')}
+            disabled={busy}
+            className={`w-full rounded-xl border py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition disabled:opacity-50 ${
+              state.candidates_preview
+                ? 'border-brand-400 bg-brand-50 text-brand-700 hover:bg-brand-100'
+                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            {state.candidates_preview ? '👁️ Candidates visible to employees — tap to hide' : '👁️ Show candidates to employees'}
+          </button>
+        )}
+
         {/* Sync candidate photos from employee roster */}
         <button
           onClick={syncPhotos}
@@ -260,10 +275,20 @@ function RoundResults({
   onPromoted: () => void;
 }) {
   const { data, mutate: mutateResults } = useSWR<RoundResultsResponse>('/api/admin/round1-results', fetcher);
-  const [maleCount, setMaleCount] = useState(15);
-  const [femaleCount, setFemaleCount] = useState(15);
+  const [maleCount, setMaleCount] = useState(10);
+  const [femaleCount, setFemaleCount] = useState(10);
   const [busy, setBusy] = useState(false);
   const [redoDone, setRedoDone] = useState(false);
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    if (!data || seeded.current) return;
+    const existingMale = data.male.filter((c) => c.is_finalist).length;
+    const existingFemale = data.female.filter((c) => c.is_finalist).length;
+    if (existingMale > 0) setMaleCount(existingMale);
+    if (existingFemale > 0) setFemaleCount(existingFemale);
+    seeded.current = true;
+  }, [data]);
 
   if (!data) return <Spinner />;
 

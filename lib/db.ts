@@ -174,6 +174,7 @@ export function getAppState(): AppState {
     event_name: map.event_name ?? 'ABHYUDAY 2026',
     voting_round: Math.max(1, parseInt(map.voting_round ?? '1', 10)),
     total_rounds: Math.max(1, parseInt(map.total_rounds ?? '2', 10)),
+    candidates_preview: map.candidates_preview === '1',
   };
 }
 

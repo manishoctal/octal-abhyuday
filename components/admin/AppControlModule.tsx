@@ -56,6 +56,7 @@ interface ConfigData {
   pushConfig: { vapid: boolean; fcm: boolean };
   authConfig: { otp_email_enabled: boolean; smtp_ready: boolean; static_otp_code: string };
   faceSearchEnabled: boolean;
+  uploadEnabled: boolean;
 }
 
 type AdminEntry = { code: string; name: string | null; department: string | null };
@@ -72,6 +73,7 @@ export default function AppControlModule() {
   const [tab, setTab]         = useState<'homepage'|'access'|'reset'|'push'|'login'|'admins'>('homepage');
   const [otpToggling, setOtpToggling]         = useState(false);
   const [faceSearchToggling, setFaceSearchToggling] = useState(false);
+  const [uploadToggling, setUploadToggling]         = useState(false);
   const [saving, setSaving]   = useState(false);
 
   // Event settings state
@@ -163,6 +165,17 @@ export default function AppControlModule() {
     setFaceSearchToggling(false);
   }
 
+  async function toggleUpload() {
+    setUploadToggling(true);
+    await fetch('/api/admin/app-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo_upload_enabled: !(data?.uploadEnabled ?? true) }),
+    });
+    await mutate();
+    setUploadToggling(false);
+  }
+
   async function doReset(key: string) {
     setResetting(key); setConfirmReset(null);
     await fetch('/api/admin/app-control', {
@@ -239,12 +252,24 @@ export default function AppControlModule() {
   ] as const;
 
   return (
-    <div className="space-y-4">
-      {/* Tab bar */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl">
+    <div className="lg:grid lg:grid-cols-[200px_1fr] lg:gap-6 lg:items-start">
+
+      {/* Desktop sidebar nav */}
+      <nav className="hidden lg:block bg-white border border-slate-200 rounded-2xl p-2 sticky top-6 space-y-0.5">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id as Parameters<typeof setTab>[0])}
-            className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition ${
+            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold transition ${
+              tab === t.id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
+            }`}>{t.label}</button>
+        ))}
+      </nav>
+
+      <div className="space-y-4 min-w-0">
+      {/* Mobile tab bar */}
+      <div className="flex lg:hidden gap-1 p-1 bg-slate-100 rounded-2xl overflow-x-auto">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id as Parameters<typeof setTab>[0])}
+            className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}>{t.label}</button>
         ))}
@@ -252,7 +277,7 @@ export default function AppControlModule() {
 
       {/* ── Homepage Visibility + Order ── */}
       {tab === 'homepage' && (
-        <>
+        <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
         {/* ── Event Settings ── */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
@@ -306,7 +331,7 @@ export default function AppControlModule() {
         </div>
 
         {/* ── Homepage Tiles ── */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden lg:self-start">
           <div className="px-5 py-4 border-b border-slate-100">
             <p className="font-bold text-slate-900">Homepage Tiles</p>
             <p className="text-xs text-slate-400 mt-0.5">Show/hide modules and drag to reorder</p>
@@ -355,12 +380,12 @@ export default function AppControlModule() {
             })}
           </div>
         </div>
-        </>
+        </div>
       )}
 
       {/* ── Module Access ── */}
       {tab === 'access' && (
-        <div className="space-y-4">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-4 space-y-4 lg:space-y-0">
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <p className="font-bold text-slate-900">Module Access</p>
@@ -428,6 +453,33 @@ export default function AppControlModule() {
               {(data?.faceSearchEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
             </button>
           </div>
+
+          {/* ── Photo Upload toggle ── */}
+          <div className="px-5 py-3.5 flex items-center gap-3 border-t border-slate-50">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
+              style={{ background: (data?.uploadEnabled ?? true) ? '#0284C7' : '#CBD5E1' }}>
+              <ImageIcon size={16} />
+            </div>
+            <div className="flex-1">
+              <p className={`font-semibold text-sm ${(data?.uploadEnabled ?? true) ? 'text-slate-800' : 'text-slate-400'}`}>
+                Photo Upload
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {(data?.uploadEnabled ?? true)
+                  ? 'Employees can upload photos to the gallery'
+                  : 'Upload button disabled — tap shows "coming soon" toast'}
+              </p>
+            </div>
+            {uploadToggling && <RefreshCw size={13} className="text-slate-300 animate-spin" />}
+            <button onClick={toggleUpload} disabled={uploadToggling}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${
+                (data?.uploadEnabled ?? true)
+                  ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+              }`}>
+              {(data?.uploadEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
+            </button>
+          </div>
         </div>
         </div>
       )}
@@ -435,12 +487,13 @@ export default function AppControlModule() {
       {/* ── Reset Data ── */}
       {tab === 'reset' && (
         <div className="space-y-3">
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5 lg:col-span-2">
             <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800 font-medium">
               Reset operations permanently delete data. This cannot be undone. Use for fresh event setup only.
             </p>
           </div>
+          <div className="lg:grid lg:grid-cols-2 lg:gap-3 space-y-3 lg:space-y-0">
           {RESET_TARGETS.map(target => {
             const isDone     = resetDone === target.key;
             const isResetting = resetting === target.key;
@@ -478,6 +531,7 @@ export default function AppControlModule() {
               </div>
             );
           })}
+          </div>
         </div>
       )}
 
@@ -786,6 +840,7 @@ export default function AppControlModule() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

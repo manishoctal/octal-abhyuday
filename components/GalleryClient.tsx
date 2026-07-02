@@ -647,8 +647,8 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
 
 /* ── main component ───────────────────────────────────────── */
 export default function GalleryClient({
-  initialApproved, initialMine, userId, useS3, faceSearchEnabled = true,
-}: { initialApproved: Photo[]; initialMine: Photo[]; userId: number; useS3: boolean; faceSearchEnabled?: boolean }) {
+  initialApproved, initialMine, userId, useS3, faceSearchEnabled = true, uploadEnabled = true,
+}: { initialApproved: Photo[]; initialMine: Photo[]; userId: number; useS3: boolean; faceSearchEnabled?: boolean; uploadEnabled?: boolean }) {
   const router = useRouter();
   const [filter, setFilter]               = useState<Filter>('all');
   const [lightboxPhotos, setLightboxPhotos] = useState<Photo[] | null>(null);
@@ -656,6 +656,12 @@ export default function GalleryClient({
   const [showUpload, setShowUpload]       = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId]           = useState<number | null>(null);
+  const [featureToast, setFeatureToast]   = useState('');
+
+  function showComingSoon(msg: string) {
+    setFeatureToast(msg);
+    setTimeout(() => setFeatureToast(''), 3000);
+  }
 
   const { data: allData,  mutate: mutateAll  } = useSWR('/api/photos',        fetcher, { fallbackData: { photos: initialApproved }, refreshInterval: 20000 });
   const { data: mineData, mutate: mutateMine } = useSWR('/api/photos?mine=1', fetcher, { fallbackData: { photos: initialMine },    refreshInterval: 20000 });
@@ -724,10 +730,15 @@ export default function GalleryClient({
             {f === 'mine' && mine.length > 0 && <span className="ml-1.5 text-[10px] font-bold opacity-70">{mine.length}</span>}
           </button>
         ))}
-        {faceSearchEnabled && (
+        {faceSearchEnabled ? (
           <button onClick={() => router.push('/my-photos')}
             className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
             style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', color: 'white' }}>
+            <ScanFace size={14} /> Find Me
+          </button>
+        ) : (
+          <button onClick={() => showComingSoon('AI photo search will be enabled soon ✨')}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold text-slate-400 bg-slate-100">
             <ScanFace size={14} /> Find Me
           </button>
         )}
@@ -787,11 +798,20 @@ export default function GalleryClient({
       )}
 
       {/* ── FAB ── */}
-      <button onClick={() => setShowUpload(true)}
+      <button
+        onClick={uploadEnabled ? () => setShowUpload(true) : () => showComingSoon('Photo upload will be open soon 📷')}
         className="fixed right-5 bottom-20 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-        style={{ background: '#FE9234' }} aria-label="Add photos">
+        style={{ background: uploadEnabled ? '#FE9234' : '#CBD5E1' }}
+        aria-label="Add photos">
         <Camera size={24} strokeWidth={1.8} color="white" />
       </button>
+
+      {/* Coming-soon toast */}
+      {featureToast && (
+        <div className="fixed bottom-36 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-xl max-w-[92vw] text-center animate-fade-in">
+          {featureToast}
+        </div>
+      )}
 
       {lightboxPhotos && (
         <Lightbox

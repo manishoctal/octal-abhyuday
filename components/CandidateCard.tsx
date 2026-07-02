@@ -11,6 +11,7 @@ export default function CandidateCard({
   isMyVote,
   canVote,
   neutral = false,
+  hideVoteBtn = false,
   onVote,
 }: {
   candidate: CandidateWithVotes;
@@ -20,6 +21,8 @@ export default function CandidateCard({
   canVote: boolean;
   /** Qualifier mode: no rank, no crown, no counts — just a pick toggle */
   neutral?: boolean;
+  /** Preview mode: hide the vote button entirely */
+  hideVoteBtn?: boolean;
   onVote: (c: CandidateWithVotes) => void;
 }) {
   const [pop, setPop] = useState(false);
@@ -118,19 +121,21 @@ export default function CandidateCard({
       )}
 
       {/* Vote button */}
-      <button
-        onClick={() => onVote(candidate)}
-        disabled={!canVote}
-        className={`mt-1.5 w-full rounded-xl py-1.5 sm:py-2 text-xs sm:text-sm font-bold transition active:scale-95 ${
-          isMyVote
-            ? 'bg-brand-600 text-white'
-            : canVote
-              ? 'bg-brand-50 text-brand-700 hover:bg-brand-100'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-        }`}
-      >
-        {isMyVote ? '✓ Voted' : 'Vote'}
-      </button>
+      {!hideVoteBtn && (
+        <button
+          onClick={() => onVote(candidate)}
+          disabled={!canVote}
+          className={`mt-1.5 w-full rounded-xl py-1.5 sm:py-2 text-xs sm:text-sm font-bold transition active:scale-95 ${
+            isMyVote
+              ? 'bg-brand-600 text-white'
+              : canVote
+                ? 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          }`}
+        >
+          {isMyVote ? '✓ Voted' : 'Vote'}
+        </button>
+      )}
     </motion.div>
   );
 }

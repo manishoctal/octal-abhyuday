@@ -34,6 +34,8 @@ export interface AppState {
   voting_round: VotingRound;
   /** Admin-configurable total number of rounds; last round is the Grand Finale */
   total_rounds: number;
+  /** When true, employees can browse the candidate list before voting opens */
+  candidates_preview: boolean;
 }
 
 export interface SessionUser {

@@ -87,6 +87,32 @@ export default function VotingClient({ greeting }: { greeting?: string }) {
   );
 
   if (state.voting_state === 'not_started') {
+    if (state.candidates_preview && data.candidates.length > 0) {
+      return (
+        <div className="relative">
+          {eventHero}
+          {qaBanner}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              👁️ Preview — voting opens soon
+            </span>
+          </div>
+          <div className="grid grid-cols-[1fr_1px_1fr] gap-x-3 sm:gap-x-5 pb-24">
+            <CategorySection
+              emoji="🤵" label="Male" gender="male" round={round}
+              candidates={data.candidates.filter((c) => c.gender === 'male')}
+              myVotes={[]} canVote={false} hideVoteBtn onVote={() => {}}
+            />
+            <div className="bg-slate-200 self-stretch rounded-full" />
+            <CategorySection
+              emoji="👸" label="Female" gender="female" round={round}
+              candidates={data.candidates.filter((c) => c.gender === 'female')}
+              myVotes={[]} canVote={false} hideVoteBtn onVote={() => {}}
+            />
+          </div>
+        </div>
+      );
+    }
     return (
       <>
         {eventHero}
@@ -265,6 +291,7 @@ function CategorySection({
   candidates,
   myVotes,
   canVote,
+  hideVoteBtn = false,
   onVote,
 }: {
   emoji: string;
@@ -274,6 +301,7 @@ function CategorySection({
   candidates: CandidateWithVotes[];
   myVotes: number[];
   canVote: boolean;
+  hideVoteBtn?: boolean;
   onVote: (c: CandidateWithVotes) => void;
 }) {
   const [search, setSearch] = useState('');
@@ -297,7 +325,7 @@ function CategorySection({
     ? displayCandidates.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
     : displayCandidates;
 
-  const chip =
+  const chip = hideVoteBtn ? null :
     myVotes.length === 0 && candidates.length > 0 ? (
       <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full">
         Pick one!
@@ -347,7 +375,8 @@ function CategorySection({
               maxVotes={maxVotes}
               isMyVote={myVotes.includes(c.id)}
               canVote={canVote}
-              neutral={round === 1}
+              neutral
+              hideVoteBtn={hideVoteBtn}
               onVote={onVote}
             />
           ))}
@@ -382,3 +411,4 @@ function StateHero({
     </div>
   );
 }
+

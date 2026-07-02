@@ -5,7 +5,7 @@ import type { VotingState } from '@/lib/types';
 import { broadcast } from '@/lib/events';
 import { sendPushToAll } from '@/lib/push';
 
-type Action = 'start' | 'pause' | 'resume' | 'end' | 'announce' | 'reset' | 'back_to_round1' | 'redo_round';
+type Action = 'start' | 'pause' | 'resume' | 'end' | 'announce' | 'reset' | 'back_to_round1' | 'redo_round' | 'toggle_preview';
 
 const transitions: Record<Action, { from: VotingState[]; to?: VotingState }> = {
   start: { from: ['not_started'], to: 'live' },
@@ -23,11 +23,18 @@ export async function POST(req: Request) {
   if (isErrorResponse(session)) return session;
 
   const { action } = (await req.json().catch(() => ({}))) as { action?: Action };
-  if (!action || !(action in transitions)) {
+  if (!action || (!(action in transitions) && action !== 'toggle_preview')) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
 
   const state = getAppState();
+
+  if (action === 'toggle_preview') {
+    setSetting('candidates_preview', state.candidates_preview ? '0' : '1');
+    broadcast('state');
+    return NextResponse.json({ ok: true, state: getAppState() });
+  }
+
   const t = transitions[action];
   if (!t.from.includes(state.voting_state)) {
     return NextResponse.json(
@@ -75,6 +82,7 @@ export async function POST(req: Request) {
     db.prepare('UPDATE candidates SET is_finalist = 0').run();
     db.prepare('DELETE FROM votes').run();
   } else {
+    if (action === 'start') setSetting('candidates_preview', '0');
     setSetting('voting_state', t.to!);
   }
 
