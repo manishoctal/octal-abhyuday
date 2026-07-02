@@ -199,7 +199,6 @@ function ProcessingPanel({ onRefresh }: { onRefresh?: () => void }) {
           <ScanFace size={15} className="text-slate-500" />
           <span className="font-bold text-slate-900 text-sm">Processing</span>
           {!allOk && <span className="w-2 h-2 rounded-full bg-amber-400" />}
-          {allOk  && <span className="w-2 h-2 rounded-full bg-green-400" />}
         </div>
         {expanded ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
       </button>
