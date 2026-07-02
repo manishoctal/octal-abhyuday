@@ -7,7 +7,7 @@ import { sendPushToAll } from '@/lib/push';
 
 type Action = 'start' | 'pause' | 'resume' | 'end' | 'announce' | 'reset' | 'back_to_round1' | 'redo_round' | 'toggle_preview';
 
-const transitions: Record<Action, { from: VotingState[]; to?: VotingState }> = {
+const transitions: Record<Exclude<Action, 'toggle_preview'>, { from: VotingState[]; to?: VotingState }> = {
   start: { from: ['not_started'], to: 'live' },
   pause: { from: ['live'], to: 'paused' },
   resume: { from: ['paused'], to: 'live' },
