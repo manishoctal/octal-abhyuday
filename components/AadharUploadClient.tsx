@@ -356,28 +356,29 @@ export default function AadharUploadClient({ initial, useS3 }: Props) {
                     <>
                       <Image src={img} alt={`Aadhar ${side}`} fill className="object-cover" unoptimized />
 
-                      {/* Overlay actions */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                      {/* Always-visible action bar at bottom (works on touch) */}
+                      <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-2 py-2"
+                        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)' }}>
                         <button
                           onClick={() => setViewSide(side)}
-                          className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow active:scale-90 transition"
+                          className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow active:scale-90 transition"
                           title="View full size"
                         >
-                          <Eye size={15} className="text-slate-700" />
+                          <Eye size={14} className="text-slate-700" />
                         </button>
                         <button
                           onClick={() => fileRef(side).current?.click()}
-                          className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow active:scale-90 transition"
+                          className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow active:scale-90 transition"
                           title="Replace from gallery"
                         >
-                          <Upload size={15} className="text-slate-700" />
+                          <Upload size={14} className="text-slate-700" />
                         </button>
                         <button
                           onClick={() => camRef(side).current?.click()}
-                          className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow active:scale-90 transition"
+                          className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow active:scale-90 transition"
                           title="Capture with camera"
                         >
-                          <Camera size={15} className="text-slate-700" />
+                          <Camera size={14} className="text-slate-700" />
                         </button>
                       </div>
                     </>

@@ -48,7 +48,7 @@ function FlipUnit({ value, label, accent = false }: { value:number; label:string
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div
-        className="relative w-[52px] h-[60px] rounded-[14px] overflow-hidden flex items-center justify-center"
+        className="relative w-[46px] h-[54px] rounded-[12px] overflow-hidden flex items-center justify-center"
         style={{
           background: accent
             ? 'linear-gradient(180deg,rgba(255,122,0,0.28) 0%,rgba(194,65,12,0.18) 100%)'
@@ -69,7 +69,7 @@ function FlipUnit({ value, label, accent = false }: { value:number; label:string
             animate={{ y: '0%',   opacity: 1 }}
             exit={{   y: '80%',   opacity: 0 }}
             transition={{ duration: 0.14, ease: 'easeInOut' }}
-            className={`text-[22px] font-black tabular-nums leading-none select-none ${accent ? 'text-orange-300' : 'text-white'}`}
+            className={`text-[20px] font-black tabular-nums leading-none select-none ${accent ? 'text-orange-300' : 'text-white'}`}
           >
             {str}
           </motion.span>
