@@ -293,10 +293,9 @@ function CategorySection({
     : candidates;
 
   const maxVotes = Math.max(1, ...displayCandidates.map((c) => c.vote_count));
-  const filtered =
-    round === 1 && search.trim()
-      ? displayCandidates.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
-      : displayCandidates;
+  const filtered = search.trim()
+    ? displayCandidates.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : displayCandidates;
 
   const chip =
     myVotes.length === 0 && candidates.length > 0 ? (
@@ -321,7 +320,7 @@ function CategorySection({
           </h2>
           {chip}
         </div>
-        {round === 1 && candidates.length > 8 && (
+        {candidates.length > 8 && (
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

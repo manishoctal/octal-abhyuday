@@ -797,11 +797,10 @@ export function promoteTopByVotes(
   currentRound: number,
   nextRound: number,
 ): { male: CandidateWithVotes[]; female: CandidateWithVotes[] } {
+  // Always take exactly N — ties broken by first-vote timestamp (MIN(v.updated_at) ASC in the query).
   const pick = (gender: Gender, n: number) => {
-    const ranked = listCandidates(gender, { round: currentRound, finalistsOnly: currentRound > 1 });
-    if (ranked.length <= n) return ranked;
-    const cutoff = ranked[n - 1].vote_count;
-    return cutoff > 0 ? ranked.filter((c) => c.vote_count >= cutoff) : ranked.slice(0, n);
+    const ranked = listCandidates(gender, { round: currentRound, finalistsOnly: false });
+    return ranked.slice(0, n);
   };
   const male = pick('male', maleCount);
   const female = pick('female', femaleCount);

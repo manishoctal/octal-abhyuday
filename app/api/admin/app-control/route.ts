@@ -40,7 +40,9 @@ export async function GET() {
     static_otp_code: process.env.OTP_CODE ?? '1234',
   };
 
-  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig });
+  const faceSearchEnabled = getSetting('face_search_enabled') !== '0';
+
+  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig, faceSearchEnabled });
 }
 
 export async function POST(req: Request) {
@@ -52,6 +54,12 @@ export async function POST(req: Request) {
   // Toggle OTP email mode
   if ('otp_email_enabled' in body) {
     setSetting('otp_email_enabled', body.otp_email_enabled ? '1' : '0');
+    return NextResponse.json({ ok: true });
+  }
+
+  // Toggle AI face search
+  if ('face_search_enabled' in body) {
+    setSetting('face_search_enabled', body.face_search_enabled ? '1' : '0');
     return NextResponse.json({ ok: true });
   }
 

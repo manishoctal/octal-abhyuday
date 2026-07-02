@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import { getAppState, listPhotos, listUserPhotos, getModuleConfig } from '@/lib/db';
+import { getAppState, listPhotos, listUserPhotos, getModuleConfig, getSetting } from '@/lib/db';
 import { isS3Configured } from '@/lib/s3';
 import GalleryClient from '@/components/GalleryClient';
 import ModuleDisabled from '@/components/ModuleDisabled';
@@ -24,6 +24,7 @@ export default async function GalleryPage() {
           initialMine={listUserPhotos(session.id)}
           userId={session.id}
           useS3={isS3Configured()}
+          faceSearchEnabled={getSetting('face_search_enabled') !== '0'}
         />
       </main>
 

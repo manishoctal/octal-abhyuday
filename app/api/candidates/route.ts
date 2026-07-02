@@ -24,8 +24,8 @@ export async function GET(req: Request) {
     finalistsOnly: round > 1,
     orderByName: round === 1,
   });
-  if (!isFinalRound) {
-    // Hide counts from voters until the Grand Finale
+  if (!isFinalRound && state.voting_state !== 'ended') {
+    // Hide counts during active voting to prevent bandwagon effect; reveal once round ends
     candidates = candidates.map((c) => ({ ...c, vote_count: 0 }));
   }
 

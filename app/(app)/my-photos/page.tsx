@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import { getAppState } from '@/lib/db';
+import { getAppState, getSetting } from '@/lib/db';
 import MyPhotosClient from '@/components/MyPhotosClient';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export default async function MyPhotosPage() {
     <>
       <Header eventName={getAppState().event_name} title="My Photos" isAdmin={session.isAdmin} />
       <main className="max-w-lg mx-auto px-4 pt-4">
-        <MyPhotosClient />
+        <MyPhotosClient faceSearchEnabled={getSetting('face_search_enabled') !== '0'} />
       </main>
 
     </>

@@ -17,8 +17,10 @@ export async function GET(req: Request) {
   // ranked results so the admin can see the original vote counts before re-promoting.
   const isRedo = round > 1 && state.voting_state === 'not_started';
   const displayRound = isRedo ? round - 1 : round;
-  const male   = listCandidates('male',   { round: displayRound, finalistsOnly: displayRound > 1 });
-  const female = listCandidates('female', { round: displayRound, finalistsOnly: displayRound > 1 });
+  // Use finalistsOnly only on the first pass; after a redo the flags are cleared so
+  // we fall back to all candidates ranked by vote count.
+  const male   = listCandidates('male',   { round: displayRound, finalistsOnly: false });
+  const female = listCandidates('female', { round: displayRound, finalistsOnly: false });
 
   if (new URL(req.url).searchParams.get('format') === 'csv') {
     const esc = (v: string | null) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -48,7 +50,9 @@ export async function POST(req: Request) {
   if (isErrorResponse(session)) return session;
 
   const state = getAppState();
-  if (state.voting_round >= state.total_rounds) {
+  // Allow re-promotion into the Grand Finale when it's a redo (not_started at final round)
+  const isRedoFinal = state.voting_state === 'not_started' && state.voting_round === state.total_rounds && state.voting_round > 1;
+  if (state.voting_round >= state.total_rounds && !isRedoFinal) {
     return NextResponse.json(
       { error: `Already in the Grand Finale (round ${state.total_rounds}) — no further rounds to promote to` },
       { status: 409 }
@@ -75,11 +79,15 @@ export async function POST(req: Request) {
   const nextRound = isRedo ? state.voting_round : state.voting_round + 1;
   const promoted = promoteTopByVotes(m, f, fromRound, nextRound);
   broadcast('state');
-  sendPushToAll(
-    `🎖️ Round ${nextRound} is now open!`,
-    `Finalists have been selected — vote now in Round ${nextRound}.`,
-    '/vote'
-  ).catch(() => {});
+  // Only push when actually advancing to a new round — redo just re-selects finalists,
+  // voting hasn't opened yet so "Round N is now open" would be misleading.
+  if (!isRedo) {
+    sendPushToAll(
+      `🎖️ Round ${nextRound} is now open!`,
+      `Finalists have been selected — vote now in Round ${nextRound}.`,
+      '/vote'
+    ).catch(() => {});
+  }
   return NextResponse.json({
     ok: true,
     state: getAppState(),

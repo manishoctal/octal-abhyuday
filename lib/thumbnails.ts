@@ -42,26 +42,18 @@ export async function thumbnailForS3(
   photoId: number,
 ): Promise<string | null> {
   try {
-    const { isS3Configured, presignUpload, getPublicUrl, extractS3Key } = await import('./s3');
+    const { isS3Configured, getPublicUrl, extractS3Key } = await import('./s3');
     if (!isS3Configured()) return null;
 
-    // Download original
-    const res = await fetch(originalUrl, { signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-
-    const thumb = await resizeToThumbnail(buf);
-    if (!thumb) return null;
-
-    // Derive a thumbnail key from the original
     const origKey = extractS3Key(originalUrl);
     const baseKey = origKey
-      ? origKey.replace(/\.[^.]+$/, '') // strip extension
+      ? origKey.replace(/\.[^.]+$/, '')
       : `abhyuday-2026/gallery/thumb-${photoId}`;
     const thumbKey = `${baseKey}-thumb.webp`;
 
-    // Upload thumbnail
-    const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+    // Download original directly from S3 — bypasses CloudFront propagation delay
+    // so thumbnails generate correctly even for freshly-uploaded employee photos.
+    const { S3Client, GetObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3');
     const client = new S3Client({
       region: process.env.AWS_REGION ?? 'ap-south-1',
       credentials: {
@@ -69,6 +61,24 @@ export async function thumbnailForS3(
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
       },
     });
+
+    if (!origKey) return null;
+    const getRes = await client.send(new GetObjectCommand({
+      Bucket: process.env.S3_BUCKET_NAME!,
+      Key: origKey,
+    }));
+    if (!getRes.Body) return null;
+
+    // Collect stream into buffer
+    const chunks: Buffer[] = [];
+    for await (const chunk of getRes.Body as AsyncIterable<Buffer>) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const buf = Buffer.concat(chunks);
+
+    const thumb = await resizeToThumbnail(buf);
+    if (!thumb) return null;
+
     await client.send(new PutObjectCommand({
       Bucket: process.env.S3_BUCKET_NAME!,
       Key: thumbKey,

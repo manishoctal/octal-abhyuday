@@ -7,7 +7,7 @@ import {
   CalendarDays, Trophy, ImageIcon, Vote, MessageSquare, BarChart3,
   QrCode, MapPin, Star, CheckCircle2, AlertTriangle, Wifi, WifiOff,
   ShieldCheck, ShieldPlus, ShieldOff, X, Crown, ChevronUp, ChevronDown, GripVertical,
-  Timer, Save,
+  Timer, Save, ScanFace,
 } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -55,6 +55,7 @@ interface ConfigData {
   pushStats: { web: number; android: number; ios: number; total: number };
   pushConfig: { vapid: boolean; fcm: boolean };
   authConfig: { otp_email_enabled: boolean; smtp_ready: boolean; static_otp_code: string };
+  faceSearchEnabled: boolean;
 }
 
 type AdminEntry = { code: string; name: string | null; department: string | null };
@@ -69,7 +70,8 @@ export default function AppControlModule() {
   const { data: adminData, mutate: mutateAdmins } = useSWR<AdminsData>('/api/admin/admins', fetcher);
   const { data: settingsData, mutate: mutateSettings } = useSWR<{ eventName: string; eventDate: string; totalRounds: number }>('/api/admin/settings', fetcher);
   const [tab, setTab]         = useState<'homepage'|'access'|'reset'|'push'|'login'|'admins'>('homepage');
-  const [otpToggling, setOtpToggling] = useState(false);
+  const [otpToggling, setOtpToggling]         = useState(false);
+  const [faceSearchToggling, setFaceSearchToggling] = useState(false);
   const [saving, setSaving]   = useState(false);
 
   // Event settings state
@@ -148,6 +150,17 @@ export default function AppControlModule() {
   function toggleEnabled(key: ModuleKey) {
     const newEna = { ...enabled, [key]: !enabled[key] };
     saveConfig(visibility, newEna);
+  }
+
+  async function toggleFaceSearch() {
+    setFaceSearchToggling(true);
+    await fetch('/api/admin/app-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ face_search_enabled: !(data?.faceSearchEnabled ?? true) }),
+    });
+    await mutate();
+    setFaceSearchToggling(false);
   }
 
   async function doReset(key: string) {
@@ -347,6 +360,7 @@ export default function AppControlModule() {
 
       {/* ── Module Access ── */}
       {tab === 'access' && (
+        <div className="space-y-4">
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <p className="font-bold text-slate-900">Module Access</p>
@@ -381,6 +395,40 @@ export default function AppControlModule() {
               );
             })}
           </div>
+        </div>
+
+        {/* ── AI Face Search toggle ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <p className="font-bold text-slate-900">AI Features</p>
+            <p className="text-xs text-slate-400 mt-0.5">Enable or disable AI-powered features independently of the module</p>
+          </div>
+          <div className="px-5 py-3.5 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
+              style={{ background: (data?.faceSearchEnabled ?? true) ? '#6366F1' : '#CBD5E1' }}>
+              <ScanFace size={16} />
+            </div>
+            <div className="flex-1">
+              <p className={`font-semibold text-sm ${(data?.faceSearchEnabled ?? true) ? 'text-slate-800' : 'text-slate-400'}`}>
+                AI Face Search ("Find Me")
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {(data?.faceSearchEnabled ?? true)
+                  ? 'Employees can search photos by face'
+                  : 'Hidden from gallery — enable after event to reduce load'}
+              </p>
+            </div>
+            {faceSearchToggling && <RefreshCw size={13} className="text-slate-300 animate-spin" />}
+            <button onClick={toggleFaceSearch} disabled={faceSearchToggling}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${
+                (data?.faceSearchEnabled ?? true)
+                  ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+              }`}>
+              {(data?.faceSearchEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
+            </button>
+          </div>
+        </div>
         </div>
       )}
 

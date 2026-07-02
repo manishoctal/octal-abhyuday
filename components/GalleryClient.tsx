@@ -647,8 +647,8 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
 
 /* ── main component ───────────────────────────────────────── */
 export default function GalleryClient({
-  initialApproved, initialMine, userId, useS3,
-}: { initialApproved: Photo[]; initialMine: Photo[]; userId: number; useS3: boolean }) {
+  initialApproved, initialMine, userId, useS3, faceSearchEnabled = true,
+}: { initialApproved: Photo[]; initialMine: Photo[]; userId: number; useS3: boolean; faceSearchEnabled?: boolean }) {
   const router = useRouter();
   const [filter, setFilter]               = useState<Filter>('all');
   const [lightboxPhotos, setLightboxPhotos] = useState<Photo[] | null>(null);
@@ -724,11 +724,13 @@ export default function GalleryClient({
             {f === 'mine' && mine.length > 0 && <span className="ml-1.5 text-[10px] font-bold opacity-70">{mine.length}</span>}
           </button>
         ))}
-        <button onClick={() => router.push('/my-photos')}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-          style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', color: 'white' }}>
-          <ScanFace size={14} /> Find Me
-        </button>
+        {faceSearchEnabled && (
+          <button onClick={() => router.push('/my-photos')}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
+            style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', color: 'white' }}>
+            <ScanFace size={14} /> Find Me
+          </button>
+        )}
       </div>
 
 

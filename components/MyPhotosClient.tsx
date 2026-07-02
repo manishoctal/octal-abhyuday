@@ -95,7 +95,7 @@ function AISteps({ phase }: { phase: Phase }) {
 }
 
 /* ── Main component ──────────────────────────────────────── */
-export default function MyPhotosClient() {
+export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearchEnabled?: boolean }) {
   const [phase, setPhase]       = useState<Phase>('idle');
   const [preview, setPreview]   = useState<string | null>(null);
   const [photos, setPhotos]     = useState<Photo[]>([]);
@@ -224,19 +224,27 @@ export default function MyPhotosClient() {
     if (fileRef.current) fileRef.current.value = '';
   }
 
+  const [downloading, setDownloading] = useState(false);
+
   async function downloadAll() {
-    const res = await fetch('/api/faces/search/zip', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photoIds: photos.map(p => p.id) }),
-    });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `my-event-photos.zip`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const res = await fetch('/api/faces/search/zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoIds: photos.map(p => p.id) }),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `my-event-photos.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setDownloading(false);
+    }
   }
 
   const searching = ['detecting', 'vectorising', 'scanning', 'matching'].includes(phase);
@@ -277,6 +285,20 @@ export default function MyPhotosClient() {
     } else {
       fileRef.current?.click();
     }
+  }
+
+  if (!faceSearchEnabled) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center space-y-3 px-4">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+          <ScanFace size={28} className="text-slate-300" />
+        </div>
+        <p className="font-bold text-slate-700 text-base">AI Search Unavailable</p>
+        <p className="text-sm text-slate-400 leading-relaxed">
+          Face search is disabled during the event to keep things running smoothly. Check back after the event!
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -383,10 +405,17 @@ export default function MyPhotosClient() {
                 </div>
                 <div className="flex gap-2">
                   {photos.length > 0 && (
-                    <button onClick={downloadAll}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-1.5"
+                    <button onClick={downloadAll} disabled={downloading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-70 transition"
                       style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}>
-                      <Download size={14} /> Download All
+                      {downloading ? (
+                        <>
+                          <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                          Preparing…
+                        </>
+                      ) : (
+                        <><Download size={14} /> Download All</>
+                      )}
                     </button>
                   )}
                   <button onClick={reset} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-slate-600 border border-slate-200 flex items-center justify-center gap-1.5 hover:bg-slate-50">

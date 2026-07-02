@@ -160,7 +160,7 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
               : `End Round ${round} voting?`
           )}
           {btn('🔄 Reset', 'reset', true, 'bg-slate-200 text-slate-700 hover:bg-slate-300',
-            'Reset voting to "not started"? (Votes are kept; results flag is cleared.)'
+            'Full reset: clears ALL votes, finalists, and results. Cannot be undone. Continue?'
           )}
         </div>
 
@@ -206,6 +206,17 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
           <StatCard label="Voted so far" value={stats.voters} emoji="🙋" />
         </div>
 
+        {/* Redo round — discard this round's votes and re-pick finalists */}
+        {vs === 'ended' && (
+          <button
+            onClick={() => doAction('redo_round', round === 1 ? `Discard all Round 1 votes and restart voting from scratch?` : `Discard all Round ${round} votes and re-select the Round ${round - 1} finalists with a new count?`)}
+            disabled={busy}
+            className="w-full rounded-xl border border-amber-300 bg-amber-50 py-2 text-sm font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition"
+          >
+            ↩ {round === 1 ? 'Restart Round 1 Voting' : `Re-do Round ${round} Selection`}
+          </button>
+        )}
+
         {/* Promote panel */}
         {!isFinalRound && (vs === 'ended' || round > 1) && (
           <RoundResults
@@ -215,7 +226,11 @@ function ControlTab({ notify }: { notify: (msg: string) => void }) {
           />
         )}
         {isFinalRound && (
-          <RoundResults mode="view" notify={notify} onPromoted={() => mutate()} />
+          <RoundResults
+            mode={vs === 'not_started' ? 'promote' : 'view'}
+            notify={notify}
+            onPromoted={() => mutate()}
+          />
         )}
 
         <TopFive title={`🤵 Top 10 — Male (Round ${round})`} list={data.topMale} />
@@ -367,7 +382,7 @@ function RoundResults({
             : `Standings — highlighted rows were promoted from Round ${round - 1} to Round ${round}.`}
       </p>
 
-      {mode === 'promote' && !isFinalRound && (
+      {mode === 'promote' && (
         <div className="flex items-end gap-3 flex-wrap mb-4">
           <label className="text-sm font-semibold text-slate-600">
             Top male
