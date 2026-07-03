@@ -230,8 +230,8 @@ interface VoteFlash {
 }
 
 export default function VotingStageClient({ eventName }: { eventName: string }) {
-  useRealtime(['/api/admin/stats', '/api/awards']);
-  const { data } = useSWR<StatsResponse>('/api/admin/stats', fetcher, {
+  useRealtime(['/api/stage-stats', '/api/awards']);
+  const { data } = useSWR<StatsResponse>('/api/stage-stats', fetcher, {
     refreshInterval: 10000,
   });
   const { data: awardsData } = useSWR('/api/awards', fetcher, { refreshInterval: 8000 });
