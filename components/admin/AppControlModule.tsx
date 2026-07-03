@@ -57,6 +57,7 @@ interface ConfigData {
   authConfig: { otp_email_enabled: boolean; smtp_ready: boolean; static_otp_code: string };
   faceSearchEnabled: boolean;
   uploadEnabled: boolean;
+  dbExportEnabled: boolean;
 }
 
 type AdminEntry = { code: string; name: string | null; department: string | null };
@@ -74,6 +75,8 @@ export default function AppControlModule() {
   const [otpToggling, setOtpToggling]         = useState(false);
   const [faceSearchToggling, setFaceSearchToggling] = useState(false);
   const [uploadToggling, setUploadToggling]         = useState(false);
+  const [dbExportToggling, setDbExportToggling]     = useState(false);
+  const [dbDownloading, setDbDownloading]           = useState(false);
   const [saving, setSaving]   = useState(false);
 
   // Event settings state
@@ -174,6 +177,34 @@ export default function AppControlModule() {
     });
     await mutate();
     setUploadToggling(false);
+  }
+
+  async function toggleDbExport() {
+    setDbExportToggling(true);
+    await fetch('/api/admin/app-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ db_export_enabled: !(data?.dbExportEnabled ?? true) }),
+    });
+    await mutate();
+    setDbExportToggling(false);
+  }
+
+  async function downloadDb() {
+    setDbDownloading(true);
+    try {
+      const res = await fetch('/api/admin/export-db');
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ?? 'vote.db';
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDbDownloading(false);
+    }
   }
 
   async function doReset(key: string) {
@@ -487,6 +518,54 @@ export default function AppControlModule() {
       {/* ── Reset Data ── */}
       {tab === 'reset' && (
         <div className="space-y-3">
+          {/* DB Export control */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="font-bold text-slate-900">Database Export</p>
+              <p className="text-xs text-slate-400 mt-0.5">Control who can download a full copy of the database</p>
+            </div>
+            <div className="px-5 py-3.5 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
+                style={{ background: (data?.dbExportEnabled ?? true) ? '#0F766E' : '#CBD5E1' }}>
+                <ShieldCheck size={16} />
+              </div>
+              <div className="flex-1">
+                <p className={`font-semibold text-sm ${(data?.dbExportEnabled ?? true) ? 'text-slate-800' : 'text-slate-400'}`}>
+                  DB Export
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  {(data?.dbExportEnabled ?? true)
+                    ? 'Admins can download a full database backup'
+                    : 'Export blocked — download button will be disabled'}
+                </p>
+              </div>
+              {dbExportToggling && <RefreshCw size={13} className="text-slate-300 animate-spin" />}
+              <button onClick={toggleDbExport} disabled={dbExportToggling}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${
+                  (data?.dbExportEnabled ?? true)
+                    ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                    : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                }`}>
+                {(data?.dbExportEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
+              </button>
+            </div>
+            <div className="px-5 py-3.5 border-t border-slate-50 flex items-center justify-between gap-3">
+              <p className="text-xs text-slate-500">
+                Downloads a live SQLite snapshot of all event data
+              </p>
+              <button
+                onClick={downloadDb}
+                disabled={dbDownloading || !(data?.dbExportEnabled ?? true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed bg-teal-700 text-white hover:bg-teal-800"
+              >
+                {dbDownloading
+                  ? <RefreshCw size={12} className="animate-spin" />
+                  : <ShieldCheck size={12} />}
+                {dbDownloading ? 'Downloading…' : 'Download DB'}
+              </button>
+            </div>
+          </div>
+
           <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5 lg:col-span-2">
             <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800 font-medium">

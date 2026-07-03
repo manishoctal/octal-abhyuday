@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { db } from '@/lib/db';
+import { db, getSetting } from '@/lib/db';
 import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const session = await requireAdmin();
   if (isErrorResponse(session)) return session;
+
+  if (getSetting('db_export_enabled') === '0') {
+    return NextResponse.json({ error: 'DB export is disabled by admin' }, { status: 403 });
+  }
 
   // Write a hot backup via SQLite's built-in backup API.
   // This is safe to run while the DB is live — it acquires a shared lock per

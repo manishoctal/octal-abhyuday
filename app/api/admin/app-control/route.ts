@@ -42,8 +42,9 @@ export async function GET() {
 
   const faceSearchEnabled  = getSetting('face_search_enabled')   !== '0';
   const uploadEnabled      = getSetting('photo_upload_enabled')  !== '0';
+  const dbExportEnabled    = getSetting('db_export_enabled')     !== '0';
 
-  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig, faceSearchEnabled, uploadEnabled });
+  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig, faceSearchEnabled, uploadEnabled, dbExportEnabled });
 }
 
 export async function POST(req: Request) {
@@ -67,6 +68,12 @@ export async function POST(req: Request) {
   // Toggle photo upload
   if ('photo_upload_enabled' in body) {
     setSetting('photo_upload_enabled', body.photo_upload_enabled ? '1' : '0');
+    return NextResponse.json({ ok: true });
+  }
+
+  // Toggle DB export
+  if ('db_export_enabled' in body) {
+    setSetting('db_export_enabled', body.db_export_enabled ? '1' : '0');
     return NextResponse.json({ ok: true });
   }
 
