@@ -164,23 +164,35 @@ function fmtDate(iso: string) {
 /* ── Today's Highlights (horizontal scroll strip) ───────────── */
 function TodaysHighlights({ sessions }: { sessions: ScheduleSession[] }) {
   const today = new Date();
-  const items = sessions.filter(s => {
-    const d = new Date(s.start_time);
-    return d.getFullYear() === today.getFullYear() &&
-           d.getMonth()    === today.getMonth()    &&
-           d.getDate()     === today.getDate();
-  }).slice(0, 6);
+  const sorted = [...sessions]
+    .filter(s => {
+      const d = new Date(s.start_time);
+      return d.getFullYear() === today.getFullYear() &&
+             d.getMonth()    === today.getMonth()    &&
+             d.getDate()     === today.getDate();
+    })
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  const items = sorted.slice(0, 6);
   if (!items.length) return null;
 
+  const now = Date.now();
   return (
     <div className="mt-4 pt-3.5 border-t border-white/10">
       <p className="text-[9px] font-bold uppercase tracking-[0.18em] mb-2.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
         Today&apos;s Highlights
       </p>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
-        {items.map(s => {
-          const isNow = new Date(s.start_time).getTime() <= Date.now() &&
-            (!s.end_time || new Date(s.end_time).getTime() > Date.now());
+        {items.map((s, idx) => {
+          const start = new Date(s.start_time).getTime();
+          // Use explicit end_time; otherwise use next session's start as implicit end,
+          // or fall back to 1 hour so a session without end_time doesn't stay "In Progress" forever.
+          const nextStart = sorted[idx + 1] ? new Date(sorted[idx + 1].start_time).getTime() : null;
+          const end = s.end_time
+            ? new Date(s.end_time).getTime()
+            : (nextStart ?? (start + 3_600_000));
+          const isNow = start <= now && now < end;
+          const isPast = now >= end;
           return (
             <Link
               key={s.id}
@@ -189,6 +201,7 @@ function TodaysHighlights({ sessions }: { sessions: ScheduleSession[] }) {
               style={{
                 background:   isNow ? 'rgba(255,122,0,0.16)' : 'rgba(255,255,255,0.07)',
                 borderColor:  isNow ? 'rgba(255,122,0,0.40)' : 'rgba(255,255,255,0.09)',
+                opacity:      isPast && !isNow ? 0.45 : 1,
               }}
             >
               <span className="text-base leading-none">{SESSION_EMOJI[s.type] ?? '📌'}</span>
@@ -196,7 +209,7 @@ function TodaysHighlights({ sessions }: { sessions: ScheduleSession[] }) {
                 <p className="text-white text-[11px] font-semibold whitespace-nowrap">{s.title}</p>
                 <p className="text-[10px] font-medium mt-0.5"
                   style={{ color: isNow ? '#fb923c' : 'rgba(255,255,255,0.38)' }}>
-                  {isNow ? 'In Progress' : fmtTime(s.start_time)}
+                  {isNow ? 'In Progress' : isPast ? 'Done' : fmtTime(s.start_time)}
                 </p>
               </div>
             </Link>
