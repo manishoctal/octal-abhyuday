@@ -210,10 +210,18 @@ function TodaysHighlights({ sessions }: { sessions: ScheduleSession[] }) {
 /* ── Up Next card ───────────────────────────────────────────── */
 function UpNext({ sessions }: { sessions: ScheduleSession[] }) {
   const now = Date.now();
-  const ongoing  = sessions.find(s => new Date(s.start_time).getTime() <= now && s.end_time && new Date(s.end_time).getTime() > now);
-  const upcoming = sessions.find(s => new Date(s.start_time).getTime() > now);
+  const sorted   = [...sessions].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  const ongoing  = sorted.find(s => new Date(s.start_time).getTime() <= now && s.end_time && new Date(s.end_time).getTime() > now);
+  const upcoming = sorted.find(s => new Date(s.start_time).getTime() > now);
   const item = ongoing ?? upcoming;
   if (!item) return null;
+
+  // If the only remaining item is the very last session (Departure / Closing),
+  // and all others have already started, the main programme is over — hide Up Next.
+  if (!ongoing && sorted.length > 1) {
+    const allContentDone = sorted.slice(0, -1).every(s => new Date(s.start_time).getTime() <= now);
+    if (allContentDone && item === sorted[sorted.length - 1]) return null;
+  }
 
   const isOngoing = !!ongoing;
   const diffMin   = Math.round((new Date(item.start_time).getTime() - now) / 60000);
@@ -336,9 +344,16 @@ export default function DashboardClient({
     const now    = Date.now();
     const sorted = [...schedule].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     const start  = new Date(sorted[0].start_time).getTime();
-    const end    = new Date(sorted[sorted.length - 1].end_time ?? sorted[sorted.length - 1].start_time).getTime();
+    const last   = sorted[sorted.length - 1];
+    const end    = new Date(last.end_time ?? last.start_time).getTime();
     if (now <= start) return 0;
     if (now >= end)   return 100;
+    // Once all sessions except the final one (typically Departure/Closing) have
+    // started, the main programme is done — show 100% rather than "progress to Departure".
+    if (sorted.length > 1) {
+      const allContentDone = sorted.slice(0, -1).every(s => new Date(s.start_time).getTime() <= now);
+      if (allContentDone) return 100;
+    }
     return Math.round(((now - start) / (end - start)) * 100);
   })();
 
