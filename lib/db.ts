@@ -1486,7 +1486,7 @@ try {
   const adminEmails = (process.env.ADMIN_EMAILS ?? '')
     .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
-  const allCodes    = [...new Set([...adminCodes, rootCode])];
+  const allCodes    = Array.from(new Set([...adminCodes, rootCode]));
   const adminUserIds = new Set<number>();
 
   for (const code of allCodes) {
@@ -1499,7 +1499,7 @@ try {
   }
 
   if (adminUserIds.size) {
-    const ids = [...adminUserIds];
+    const ids = Array.from(adminUserIds);
     const placeholders = ids.map(() => '?').join(',');
     const result = db.prepare(
       `UPDATE photos SET uploader_id = 0 WHERE uploader_id IN (${placeholders})`
