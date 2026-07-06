@@ -443,7 +443,7 @@ export default function DashboardClient({
           />
         ))}
 
-        <div className="relative px-4 pt-5 pb-0">
+        <div className="relative px-4 pt-5 pb-5">
           {/* LIVE badge */}
           {anyLive && (
             <Link

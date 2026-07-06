@@ -1243,7 +1243,8 @@ export function addPhoto(uploaderId: number, uploaderName: string, url: string, 
   return r.lastInsertRowid as number;
 }
 export function addPhotoPreApproved(uploaderId: number, uploaderName: string, url: string, caption: string | null, sessionTag: string | null) {
-  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag, approved) VALUES (?,?,?,?,?,1)').run(uploaderId, uploaderName, url, caption, sessionTag);
+  // Use uploader_id=0 so admin-panel uploads don't appear in any employee's "My Uploads"
+  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag, approved) VALUES (?,?,?,?,?,1)').run(0, uploaderName, url, caption, sessionTag);
   return r.lastInsertRowid as number;
 }
 export function disablePhoto(id: number) {
