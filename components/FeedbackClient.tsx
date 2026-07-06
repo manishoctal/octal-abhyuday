@@ -4,8 +4,9 @@ import { useState } from 'react';
 import type { FeedbackQuestion, FeedbackSubmission } from '@/lib/db';
 
 interface Props {
-  questions:  FeedbackQuestion[];
-  existing:   FeedbackSubmission | null;
+  questions:      FeedbackQuestion[];
+  existing:       FeedbackSubmission | null;
+  editingAllowed: boolean;
 }
 
 function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -31,7 +32,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
-export default function FeedbackClient({ questions, existing }: Props) {
+export default function FeedbackClient({ questions, existing, editingAllowed }: Props) {
   const initial = existing?.answers ? (JSON.parse(existing.answers) as Record<string, unknown>) : {};
   const [answers, setAnswers]       = useState<Record<string, unknown>>(initial);
   const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
@@ -91,7 +92,7 @@ export default function FeedbackClient({ questions, existing }: Props) {
     }
   }
 
-  if (saved || existing) {
+  if (saved || (existing && !editingAllowed)) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center px-4">
         <div className="w-16 h-16 rounded-3xl flex items-center justify-center text-3xl mb-5"
@@ -116,6 +117,14 @@ export default function FeedbackClient({ questions, existing }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-4 pb-8">
+
+      {/* Editing notice — only shown when admin has enabled editing */}
+      {existing && editingAllowed && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium"
+          style={{ background: '#FFF4E8', color: '#C85F10' }}>
+          <span>✏️</span> Editing your existing response — changes will be saved.
+        </div>
+      )}
 
       {/* Anonymous banner */}
       <div className="flex items-start gap-3 px-4 py-3.5 rounded-2xl"
@@ -321,7 +330,7 @@ export default function FeedbackClient({ questions, existing }: Props) {
       )}
 
       <button type="submit" disabled={submitting} className="btn-primary">
-        {submitting ? 'Submitting…' : 'Submit Feedback'}
+        {submitting ? 'Submitting…' : (existing && editingAllowed) ? 'Update Feedback' : 'Submit Feedback'}
       </button>
     </form>
   );

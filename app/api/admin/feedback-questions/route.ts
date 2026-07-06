@@ -3,6 +3,7 @@ import { requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import {
   listFeedbackQuestions, upsertFeedbackQuestion,
   deleteFeedbackQuestion, reorderFeedbackQuestions,
+  getSetting, setSetting,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,10 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const admin = await requireAdmin();
   if (isErrorResponse(admin)) return admin;
-  return NextResponse.json({ questions: listFeedbackQuestions(false) });
+  return NextResponse.json({
+    questions: listFeedbackQuestions(false),
+    editingAllowed: getSetting('feedback_editing_allowed') === '1',
+  });
 }
 
 export async function POST(req: Request) {
@@ -18,6 +22,11 @@ export async function POST(req: Request) {
   if (isErrorResponse(admin)) return admin;
 
   const body = await req.json().catch(() => ({}));
+
+  if (body.action === 'set_editing') {
+    setSetting('feedback_editing_allowed', body.value === true || body.value === '1' ? '1' : '0');
+    return NextResponse.json({ ok: true });
+  }
 
   if (body.action === 'delete') {
     if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });

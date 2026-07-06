@@ -3,6 +3,7 @@ import { requireUser, requireAdmin, isErrorResponse } from '@/lib/api-helpers';
 import {
   getFeedbackSubmission, upsertFeedbackSubmission,
   listFeedbackSubmissions, listFeedbackQuestions,
+  getSetting,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,8 @@ export async function POST(req: Request) {
   const user = await requireUser();
   if (isErrorResponse(user)) return user;
 
-  if (getFeedbackSubmission(user.id)) {
+  const editingAllowed = getSetting('feedback_editing_allowed') === '1';
+  if (!editingAllowed && getFeedbackSubmission(user.id)) {
     return NextResponse.json({ error: 'Feedback already submitted and cannot be changed.' }, { status: 409 });
   }
 

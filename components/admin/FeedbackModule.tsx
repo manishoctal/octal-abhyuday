@@ -254,12 +254,18 @@ function ResponsesTab({ questions }: { questions: FeedbackQuestion[] }) {
 }
 
 /* ── Main admin module ── */
-export default function AdminFeedbackModule({ initialQuestions }: { initialQuestions: FeedbackQuestion[] }) {
-  const { data, mutate } = useSWR<{ questions: FeedbackQuestion[] }>(
+export default function AdminFeedbackModule({
+  initialQuestions, initialEditingAllowed,
+}: {
+  initialQuestions: FeedbackQuestion[];
+  initialEditingAllowed: boolean;
+}) {
+  const { data, mutate } = useSWR<{ questions: FeedbackQuestion[]; editingAllowed: boolean }>(
     '/api/admin/feedback-questions', fetcher,
-    { fallbackData: { questions: initialQuestions } }
+    { fallbackData: { questions: initialQuestions, editingAllowed: initialEditingAllowed } }
   );
-  const questions = data?.questions ?? initialQuestions;
+  const questions      = data?.questions      ?? initialQuestions;
+  const editingAllowed = data?.editingAllowed ?? initialEditingAllowed;
 
   const [tab, setTab]             = useState<'responses' | 'questions'>('responses');
   const [adding, setAdding]       = useState(false);
@@ -318,6 +324,15 @@ export default function AdminFeedbackModule({ initialQuestions }: { initialQuest
     await mutate();
   }
 
+  async function toggleEditing() {
+    await fetch('/api/admin/feedback-questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_editing', value: !editingAllowed }),
+    });
+    await mutate();
+  }
+
   async function toggleActive(q: FeedbackQuestion) {
     await fetch('/api/admin/feedback-questions', {
       method: 'POST',
@@ -351,6 +366,26 @@ export default function AdminFeedbackModule({ initialQuestions }: { initialQuest
           <p className="text-xs text-slate-500 font-medium px-0.5">
             Configure what employees see on the feedback form. Changes apply immediately.
           </p>
+
+          {/* Editing toggle */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200">
+            <div>
+              <p className="text-sm font-bold text-slate-800">Allow editing responses</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {editingAllowed ? 'Employees can update their feedback anytime.' : 'Responses are locked after submission.'}
+              </p>
+            </div>
+            <button
+              onClick={toggleEditing}
+              className="relative w-11 h-6 rounded-full transition-colors shrink-0"
+              style={{ background: editingAllowed ? '#FF7A00' : '#CBD5E1' }}
+            >
+              <span
+                className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                style={{ transform: editingAllowed ? 'translateX(21px)' : 'translateX(2px)' }}
+              />
+            </button>
+          </div>
 
           {sorted.map((q, idx) => {
             const meta = TYPE_META[q.type as FeedbackQuestionType] ?? TYPE_META.text;
