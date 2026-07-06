@@ -5,7 +5,12 @@ import { listEmployeeEngagement } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const admin = await requireAdmin();
-  if (isErrorResponse(admin)) return admin;
-  return NextResponse.json({ rows: listEmployeeEngagement() });
+  try {
+    const admin = await requireAdmin();
+    if (isErrorResponse(admin)) return admin;
+    return NextResponse.json({ rows: listEmployeeEngagement() });
+  } catch (e) {
+    console.error('[engagement]', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

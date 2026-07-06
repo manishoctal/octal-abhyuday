@@ -1397,6 +1397,9 @@ const empCols = (db.prepare('PRAGMA table_info(employees)').all() as { name: str
 if (!empCols.includes('exclude_from_voting')) {
   db.exec('ALTER TABLE employees ADD COLUMN exclude_from_voting INTEGER NOT NULL DEFAULT 0');
 }
+if (!empCols.includes('is_active')) {
+  db.exec('ALTER TABLE employees ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
+}
 
 // add employee_code to users + candidates
 const userColsV2 = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
