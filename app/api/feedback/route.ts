@@ -28,6 +28,10 @@ export async function POST(req: Request) {
   const user = await requireUser();
   if (isErrorResponse(user)) return user;
 
+  if (getFeedbackSubmission(user.id)) {
+    return NextResponse.json({ error: 'Feedback already submitted and cannot be changed.' }, { status: 409 });
+  }
+
   const { answers } = await req.json().catch(() => ({}));
   if (!answers || typeof answers !== 'object') {
     return NextResponse.json({ error: 'answers object required' }, { status: 400 });

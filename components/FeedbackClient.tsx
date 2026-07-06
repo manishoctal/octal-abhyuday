@@ -91,19 +91,15 @@ export default function FeedbackClient({ questions, existing }: Props) {
     }
   }
 
-  if (saved) {
+  if (saved || existing) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center px-4">
         <div className="w-16 h-16 rounded-3xl flex items-center justify-center text-3xl mb-5"
-          style={{ background: '#FFF4E8' }}>🙏</div>
-        <h2 className="font-bold text-slate-900 text-xl">Thank you!</h2>
+          style={{ background: '#F0FDF4' }}>✅</div>
+        <h2 className="font-bold text-slate-900 text-xl">Feedback Submitted</h2>
         <p className="text-slate-400 text-sm mt-2 max-w-xs leading-relaxed">
-          Your feedback has been recorded. You can update it anytime before the event ends.
+          Your response has been recorded. Feedback cannot be changed after submission.
         </p>
-        <button onClick={() => setSaved(false)} className="mt-6 text-sm font-semibold"
-          style={{ color: '#FE9234' }}>
-          Edit my feedback →
-        </button>
       </div>
     );
   }
@@ -133,12 +129,6 @@ export default function FeedbackClient({ questions, existing }: Props) {
         </div>
       </div>
 
-      {existing && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium"
-          style={{ background: '#FFF4E8', color: '#C85F10' }}>
-          <span>✏️</span> Editing your existing response — changes will be saved.
-        </div>
-      )}
 
       {/* Dynamic questions */}
       {questions.map((q, idx) => (
@@ -331,7 +321,7 @@ export default function FeedbackClient({ questions, existing }: Props) {
       )}
 
       <button type="submit" disabled={submitting} className="btn-primary">
-        {submitting ? 'Submitting…' : existing ? 'Update Feedback' : 'Submit Feedback'}
+        {submitting ? 'Submitting…' : 'Submit Feedback'}
       </button>
     </form>
   );
