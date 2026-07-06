@@ -908,7 +908,7 @@ try {
 } catch { /* duplicates already exist — safe to ignore, INSERT OR IGNORE will handle dedup */ }
 
 // Seed default feedback questions on first run
-{
+try {
   const count = (db.prepare('SELECT COUNT(*) as c FROM feedback_questions').get() as { c: number }).c;
   if (count === 0) {
     const ins = db.prepare(
@@ -923,7 +923,7 @@ try {
     });
     seed();
   }
-}
+} catch { /* seed may fail if DB is locked during build — safe to retry on next start */ }
 
 // Room allocation + Aadhar tables
 db.exec(`
@@ -1392,20 +1392,20 @@ db.exec(`
   );
 `);
 
-// Inline migrations
-const empCols = (db.prepare('PRAGMA table_info(employees)').all() as { name: string }[]).map(c => c.name);
-if (!empCols.includes('exclude_from_voting')) {
-  db.exec('ALTER TABLE employees ADD COLUMN exclude_from_voting INTEGER NOT NULL DEFAULT 0');
-}
-if (!empCols.includes('is_active')) {
-  db.exec('ALTER TABLE employees ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
-}
+// Inline migrations — each wrapped in try-catch so a locked DB during build never crashes the module
+try {
+  const empCols = (db.prepare('PRAGMA table_info(employees)').all() as { name: string }[]).map(c => c.name);
+  if (!empCols.includes('exclude_from_voting'))
+    db.exec('ALTER TABLE employees ADD COLUMN exclude_from_voting INTEGER NOT NULL DEFAULT 0');
+  if (!empCols.includes('is_active'))
+    db.exec('ALTER TABLE employees ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
+} catch { /* safe to retry on next server start */ }
 
-// add employee_code to users + candidates
-const userColsV2 = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
-if (!userColsV2.includes('employee_code')) {
-  db.exec('ALTER TABLE users ADD COLUMN employee_code TEXT');
-}
+try {
+  const userCols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
+  if (!userCols.includes('employee_code'))
+    db.exec('ALTER TABLE users ADD COLUMN employee_code TEXT');
+} catch { /* safe to retry on next server start */ }
 
 const candidateColsV2 = (db.prepare('PRAGMA table_info(candidates)').all() as { name: string }[]).map(c => c.name);
 if (!candidateColsV2.includes('employee_code')) {

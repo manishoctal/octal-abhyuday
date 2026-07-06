@@ -6,6 +6,7 @@ import path from 'path';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
+  try {
   const adminOrErr = await requireAdmin();
   if (isErrorResponse(adminOrErr)) return adminOrErr;
 
@@ -38,4 +39,8 @@ export async function POST(req: Request) {
   fs.writeFileSync(path.join(dir, filename), buffer);
 
   return NextResponse.json({ publicUrl: `/releases/${filename}` });
+  } catch (e) {
+    console.error('[apk-upload]', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
