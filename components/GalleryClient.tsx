@@ -10,7 +10,7 @@ import type { Photo } from '@/lib/db';
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 const MAX_FILES = 10;
-const MAX_SIZE  = 5 * 1024 * 1024;
+const MAX_SIZE  = 10 * 1024 * 1024;
 
 type Filter = 'all' | 'mine';
 
@@ -379,7 +379,7 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
     const arr = Array.from(raw);
     if (files.length + arr.length > MAX_FILES) { setError(`Max ${MAX_FILES} photos allowed`); return; }
     const oversized = arr.find(f => f.size > MAX_SIZE);
-    if (oversized) { setError(`"${oversized.name}" is over 5 MB`); return; }
+    if (oversized) { setError(`"${oversized.name}" is over 10 MB`); return; }
     setFiles(prev => [...prev, ...arr.map(f => ({ file: f, preview: URL.createObjectURL(f) }))]);
   }
 
@@ -489,7 +489,7 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
               <p className="text-xs text-slate-400 mt-0.5">
                 {uploading
                   ? `${doneCount} of ${files.length} done`
-                  : `Up to ${MAX_FILES} photos · 5 MB each${useS3 ? ' · Cloud' : ''}`
+                  : `Up to ${MAX_FILES} photos · 10 MB each${useS3 ? ' · Cloud' : ''}`
                 }
               </p>
             </div>
@@ -585,7 +585,7 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
               </div>
               <div className="text-center">
                 <p className="font-semibold text-slate-700 text-[15px]">Choose from Gallery</p>
-                <p className="text-xs text-slate-400 mt-1">JPEG, PNG, HEIC · max 5 MB each</p>
+                <p className="text-xs text-slate-400 mt-1">JPEG, PNG, HEIC · max 10 MB each</p>
               </div>
               <span className="px-5 py-2 rounded-full text-sm font-semibold text-white" style={{ background: '#FE9234' }}>
                 Browse Photos

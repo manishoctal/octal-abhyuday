@@ -1291,7 +1291,7 @@ export function listFeedback() {
 
 // ---------- feedback questions (configurable) ----------
 
-export type FeedbackQuestionType = 'rating' | 'text' | 'choice' | 'yesno';
+export type FeedbackQuestionType = 'rating' | 'rating_group' | 'text' | 'choice' | 'multiselect' | 'yesno';
 
 export interface FeedbackQuestion {
   id: number;
@@ -1489,6 +1489,31 @@ export interface Employee {
 
 export function listEmployees(): Employee[] {
   return db.prepare('SELECT * FROM employees ORDER BY name ASC').all() as Employee[];
+}
+
+export type EngagementStatus = 'not_logged_in' | 'inactive' | 'active';
+export type EmployeeEngagement = {
+  id: number; employee_code: string; name: string; email: string;
+  department: string | null; gender: string | null;
+  status: EngagementStatus; logged_in_at: string | null; activity_count: number;
+};
+
+export function listEmployeeEngagement(): EmployeeEngagement[] {
+  const rows = db.prepare(`
+    SELECT
+      e.id, e.employee_code, e.name, e.email, e.department, e.gender,
+      u.created_at AS logged_in_at,
+      COALESCE(p.cnt, 0) AS activity_count
+    FROM employees e
+    LEFT JOIN users u ON u.email = e.email COLLATE NOCASE
+    LEFT JOIN (SELECT user_id, COUNT(*) AS cnt FROM points GROUP BY user_id) p ON p.user_id = u.id
+    WHERE e.is_active = 1
+    ORDER BY e.name ASC
+  `).all() as (Omit<EmployeeEngagement, 'status'> & { logged_in_at: string | null; activity_count: number })[];
+  return rows.map(r => ({
+    ...r,
+    status: !r.logged_in_at ? 'not_logged_in' : r.activity_count === 0 ? 'inactive' : 'active',
+  }));
 }
 
 export function listEmployeesWithFaceStatus(): (Employee & { face_indexed: boolean })[] {

@@ -11,7 +11,7 @@ const DATA_DIR = () => process.env.DATA_DIR || path.join(process.cwd(), 'data');
 
 export const dynamic = 'force-dynamic';
 
-const MAX_SIZE  = 5 * 1024 * 1024;
+const MAX_SIZE  = 10 * 1024 * 1024;
 const MAX_FILES = 10;
 const JPEG_VARIANTS = new Set(['jfif', 'jpe', 'jif', 'jfi', 'jpeg']);
 
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
   if (files.length > MAX_FILES) return NextResponse.json({ error: `Max ${MAX_FILES} files` }, { status: 400 });
 
   const oversized = files.find(f => f.size > MAX_SIZE);
-  if (oversized) return NextResponse.json({ error: `"${oversized.name}" exceeds 5 MB limit` }, { status: 400 });
+  if (oversized) return NextResponse.json({ error: `"${oversized.name}" exceeds 10 MB limit` }, { status: 400 });
 
   const uploadsDir = path.join(DATA_DIR(), 'uploads');
   fs.mkdirSync(uploadsDir, { recursive: true });

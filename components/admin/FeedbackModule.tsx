@@ -4,7 +4,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import {
   Plus, Trash2, ChevronUp, ChevronDown, RefreshCw,
-  Star, AlignLeft, ListChecks, ThumbsUp, Eye, EyeOff, Save, X,
+  Star, AlignLeft, ListChecks, ThumbsUp, CheckSquare, LayoutList, Eye, EyeOff, Save, X,
 } from 'lucide-react';
 import type { FeedbackQuestion, FeedbackQuestionType, FeedbackSubmission } from '@/lib/db';
 
@@ -13,15 +13,17 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 type SubmissionWithUser = FeedbackSubmission & { name: string; email: string };
 
 const TYPE_META: Record<FeedbackQuestionType, { label: string; icon: React.ReactNode; color: string }> = {
-  rating: { label: 'Star Rating',       icon: <Star      size={14}/>, color: '#F59E0B' },
-  text:   { label: 'Text Answer',        icon: <AlignLeft size={14}/>, color: '#3B82F6' },
-  choice: { label: 'Multiple Choice',    icon: <ListChecks size={14}/>, color: '#8B5CF6' },
-  yesno:  { label: 'Yes / No',           icon: <ThumbsUp  size={14}/>, color: '#10B981' },
+  rating:       { label: 'Star Rating',       icon: <Star        size={14}/>, color: '#F59E0B' },
+  rating_group: { label: 'Rating Group',      icon: <LayoutList  size={14}/>, color: '#F97316' },
+  text:         { label: 'Text Answer',        icon: <AlignLeft   size={14}/>, color: '#3B82F6' },
+  choice:       { label: 'Single Choice',      icon: <ListChecks  size={14}/>, color: '#8B5CF6' },
+  multiselect:  { label: 'Multi-Select',       icon: <CheckSquare size={14}/>, color: '#EC4899' },
+  yesno:        { label: 'Yes / No',           icon: <ThumbsUp    size={14}/>, color: '#10B981' },
 };
 
 const EMPTY_FORM = {
   title: '', subtitle: '', type: 'rating' as FeedbackQuestionType,
-  options: '', required: false, active: true,
+  options: '', allowOther: false, required: false, active: true,
 };
 
 /* ── Question builder form ── */
@@ -75,17 +77,41 @@ function QuestionForm({
           ))}
         </div>
       </div>
-      {form.type === 'choice' && (
+      {(form.type === 'choice' || form.type === 'multiselect') && (
+        <div className="space-y-2">
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">
+              Options (comma-separated)
+            </label>
+            <input
+              value={form.options}
+              onChange={e => set('options', e.target.value)}
+              placeholder="e.g. Excellent, Good, Average, Poor"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={form.allowOther} onChange={e => set('allowOther', e.target.checked)}
+              className="w-4 h-4 rounded accent-orange-500" />
+            <span className="text-sm font-semibold text-slate-700">
+              Include <span className="text-orange-500">"Other (Please Specify)"</span> option
+            </span>
+          </label>
+        </div>
+      )}
+      {form.type === 'rating_group' && (
         <div>
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">
-            Options (comma-separated)
+            Sub-items (one per line)
           </label>
-          <input
+          <textarea
+            rows={6}
             value={form.options}
             onChange={e => set('options', e.target.value)}
-            placeholder="e.g. Excellent, Good, Average, Poor"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            placeholder={'e.g.\nEvent Planning & Management\nStage & Decorations\nAudio & Lighting\nFood Quality'}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
           />
+          <p className="text-[11px] text-slate-400 mt-1">Each line becomes a separate row with a 1–5 star rating.</p>
         </div>
       )}
       <div className="flex items-center gap-3">
@@ -133,7 +159,14 @@ function ResponsesTab({ questions }: { questions: FeedbackQuestion[] }) {
       const ans = JSON.parse(s.answers) as Record<string, unknown>;
       return [
         i + 1,
-        ...activeQs.map(q => `"${String(ans[String(q.id)] ?? '').replace(/"/g, '""')}"`),
+        ...activeQs.map(q => {
+          const v = ans[String(q.id)];
+          if (q.type === 'rating_group' && v && typeof v === 'object') {
+            const text = Object.entries(v as Record<string,number>).map(([k,n]) => `${k}:${n}`).join('; ');
+            return `"${text.replace(/"/g, '""')}"`;
+          }
+          return `"${String(v ?? '').replace(/"/g, '""')}"`;
+        }),
         `"${new Date(s.submitted_at).toLocaleString()}"`,
       ].join(',');
     });
@@ -186,11 +219,20 @@ function ResponsesTab({ questions }: { questions: FeedbackQuestion[] }) {
                         <td key={q.id} className="px-3 py-2.5 max-w-[180px]">
                           {!val ? (
                             <span className="text-slate-300 text-xs">—</span>
-                          ) : q.type === 'rating' ? (
+                          ) : (q.type === 'rating') ? (
                             <span className="text-amber-500 font-bold text-xs whitespace-nowrap">
                               {'⭐'.repeat(Number(val))}{'☆'.repeat(5 - Number(val))}
                               <span className="text-slate-400 font-normal ml-1">({String(val)}/5)</span>
                             </span>
+                          ) : q.type === 'rating_group' ? (
+                            <div className="space-y-0.5">
+                              {Object.entries(val as Record<string, number>).map(([item, n]) => (
+                                <div key={item} className="flex items-center gap-1.5">
+                                  <span className="text-[10px] text-slate-500 truncate max-w-[80px]" title={item}>{item}</span>
+                                  <span className="text-[10px] text-amber-500 font-bold shrink-0">{'⭐'.repeat(n)}</span>
+                                </div>
+                              ))}
+                            </div>
                           ) : (
                             <span className="text-slate-700 text-xs line-clamp-2" title={String(val)}>{String(val)}</span>
                           )}
@@ -232,9 +274,16 @@ export default function AdminFeedbackModule({ initialQuestions }: { initialQuest
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
-        options: form.type === 'choice' && form.options
-          ? JSON.stringify(form.options.split(',').map(s => s.trim()).filter(Boolean))
-          : null,
+        options: (() => {
+          if (form.type === 'rating_group' && form.options)
+            return JSON.stringify(form.options.split('\n').map(s => s.trim()).filter(Boolean));
+          if ((form.type === 'choice' || form.type === 'multiselect') && form.options)
+            return JSON.stringify([
+              ...form.options.split(',').map(s => s.trim()).filter(Boolean),
+              ...(form.allowOther ? ['__other__'] : []),
+            ]);
+          return null;
+        })(),
         required: form.required ? 1 : 0,
         active:   form.active   ? 1 : 0,
       }),
@@ -316,7 +365,14 @@ export default function AdminFeedbackModule({ initialQuestions }: { initialQuest
                       initial={{
                         id: q.id, title: q.title, subtitle: q.subtitle ?? '',
                         type: q.type as FeedbackQuestionType,
-                        options: q.options ? (JSON.parse(q.options) as string[]).join(', ') : '',
+                        options: q.options
+                          ? q.type === 'rating_group'
+                            ? (JSON.parse(q.options) as string[]).join('\n')
+                            : (JSON.parse(q.options) as string[]).filter(o => o !== '__other__').join(', ')
+                          : '',
+                        allowOther: (q.type === 'choice' || q.type === 'multiselect') && q.options
+                          ? (JSON.parse(q.options) as string[]).includes('__other__')
+                          : false,
                         required: q.required === 1, active: q.active === 1,
                       }}
                       onSave={save} onCancel={() => setEditingId(null)} saving={saving}

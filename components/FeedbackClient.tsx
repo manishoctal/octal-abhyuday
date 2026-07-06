@@ -33,18 +33,46 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 
 export default function FeedbackClient({ questions, existing }: Props) {
   const initial = existing?.answers ? (JSON.parse(existing.answers) as Record<string, unknown>) : {};
-  const [answers, setAnswers]     = useState<Record<string, unknown>>(initial);
-  const [saved, setSaved]         = useState(false);
+  const [answers, setAnswers]       = useState<Record<string, unknown>>(initial);
+  const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
+  const [saved, setSaved]           = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]         = useState('');
+  const [error, setError]           = useState('');
 
   function set(id: number, value: unknown) {
     setAnswers(prev => ({ ...prev, [String(id)]: value }));
   }
 
+  function setOther(id: number, text: string) {
+    setOtherTexts(prev => ({ ...prev, [String(id)]: text }));
+  }
+
+  function resolvedAnswers() {
+    const out: Record<string, unknown> = { ...answers };
+    for (const [key, val] of Object.entries(out)) {
+      const text = otherTexts[key] ?? '';
+      if (val === '__other__') {
+        out[key] = text ? `Other: ${text}` : 'Other';
+      } else if (Array.isArray(val) && val.includes('__other__')) {
+        out[key] = val.map(v => v === '__other__' ? (text ? `Other: ${text}` : 'Other') : v);
+      }
+    }
+    return out;
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const missing = questions.filter(q => q.active && q.required && !answers[String(q.id)]);
+    const missing = questions.filter(q => {
+      if (!q.active || !q.required) return false;
+      const val = answers[String(q.id)];
+      if (q.type === 'rating_group' && q.options) {
+        const items = JSON.parse(q.options) as string[];
+        const group = (val as Record<string, number> | undefined) ?? {};
+        return items.some(item => !group[item]);
+      }
+      if (Array.isArray(val)) return val.length === 0;
+      return !val;
+    });
     if (missing.length) {
       setError(`Please answer: ${missing.map(q => q.title).join(', ')}`);
       return;
@@ -55,7 +83,7 @@ export default function FeedbackClient({ questions, existing }: Props) {
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers: resolvedAnswers() }),
       });
       if (res.ok) setSaved(true);
     } finally {
@@ -125,7 +153,7 @@ export default function FeedbackClient({ questions, existing }: Props) {
             )}
           </div>
 
-          {/* Rating */}
+          {/* Single star rating */}
           {q.type === 'rating' && (
             <div className="space-y-1">
               <StarRating
@@ -140,6 +168,43 @@ export default function FeedbackClient({ questions, existing }: Props) {
             </div>
           )}
 
+          {/* Rating group (matrix) */}
+          {q.type === 'rating_group' && q.options && (() => {
+            const items = JSON.parse(q.options) as string[];
+            const group = (answers[String(q.id)] as Record<string, number> | undefined) ?? {};
+            return (
+              <div className="space-y-0 divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden">
+                {items.map(item => (
+                  <div key={item} className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white">
+                    <span className="text-sm text-slate-700 font-medium leading-tight flex-1">{item}</span>
+                    <div className="flex gap-1 shrink-0">
+                      {[1, 2, 3, 4, 5].map(n => {
+                        const active = n <= (group[item] ?? 0);
+                        return (
+                          <button key={n} type="button"
+                            onClick={() => set(q.id, { ...group, [item]: group[item] === n ? 0 : n })}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg transition-all active:scale-90"
+                            style={{ background: active ? '#FFF4E8' : 'transparent' }}>
+                            <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
+                              <path d="M11 2l2.472 5.236 5.528.824-4 4.05.944 5.526L11 14.948l-4.944 2.688.944-5.526-4-4.05 5.528-.824L11 2z"
+                                fill={active ? '#FE9234' : 'none'}
+                                stroke={active ? '#FE9234' : '#CBD5E1'}
+                                strokeWidth="1.5" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                <div className="flex justify-between px-3 py-1.5 bg-slate-50">
+                  <span className="text-[10px] text-slate-400">1 = Poor</span>
+                  <span className="text-[10px] text-slate-400">5 = Excellent</span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Text */}
           {q.type === 'text' && (
             <textarea
@@ -151,26 +216,90 @@ export default function FeedbackClient({ questions, existing }: Props) {
             />
           )}
 
-          {/* Multiple choice */}
-          {q.type === 'choice' && q.options && (
-            <div className="flex flex-wrap gap-2">
-              {(JSON.parse(q.options) as string[]).map(opt => {
-                const sel = answers[String(q.id)] === opt;
-                return (
-                  <button key={opt} type="button"
-                    onClick={() => set(q.id, sel ? '' : opt)}
-                    className="px-4 py-2 rounded-xl text-sm font-semibold transition border"
-                    style={{
-                      background:   sel ? '#FFF4E8' : 'white',
-                      borderColor:  sel ? '#FE9234' : '#E2E8F0',
-                      color:        sel ? '#EA580C' : '#475569',
-                    }}>
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Single choice */}
+          {q.type === 'choice' && q.options && (() => {
+            const opts = JSON.parse(q.options) as string[];
+            const otherSelected = answers[String(q.id)] === '__other__';
+            return (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {opts.map(opt => {
+                    const sel = answers[String(q.id)] === opt;
+                    return (
+                      <button key={opt} type="button"
+                        onClick={() => set(q.id, sel ? '' : opt)}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold transition border"
+                        style={{
+                          background:  sel ? '#FFF4E8' : 'white',
+                          borderColor: sel ? '#FE9234' : '#E2E8F0',
+                          color:       sel ? '#EA580C' : '#475569',
+                        }}>
+                        {opt === '__other__' ? 'Other (Please Specify)' : opt}
+                      </button>
+                    );
+                  })}
+                </div>
+                {otherSelected && (
+                  <input
+                    autoFocus
+                    value={otherTexts[String(q.id)] ?? ''}
+                    onChange={e => setOther(q.id, e.target.value)}
+                    placeholder="Please specify…"
+                    className="w-full border border-orange-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-orange-50"
+                  />
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Multi-select */}
+          {q.type === 'multiselect' && q.options && (() => {
+            const opts = JSON.parse(q.options) as string[];
+            const current = (answers[String(q.id)] as string[] | undefined) ?? [];
+            const otherSelected = current.includes('__other__');
+            return (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {opts.map(opt => {
+                    const sel = current.includes(opt);
+                    return (
+                      <button key={opt} type="button"
+                        onClick={() => {
+                          const next = sel ? current.filter(v => v !== opt) : [...current, opt];
+                          set(q.id, next);
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition border"
+                        style={{
+                          background:  sel ? '#FDF4FF' : 'white',
+                          borderColor: sel ? '#EC4899' : '#E2E8F0',
+                          color:       sel ? '#BE185D' : '#475569',
+                        }}>
+                        <span className="w-4 h-4 rounded flex items-center justify-center shrink-0 border transition"
+                          style={{
+                            background:  sel ? '#EC4899' : 'white',
+                            borderColor: sel ? '#EC4899' : '#CBD5E1',
+                          }}>
+                          {sel && <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>}
+                        </span>
+                        {opt === '__other__' ? 'Other (Please Specify)' : opt}
+                      </button>
+                    );
+                  })}
+                </div>
+                {otherSelected && (
+                  <input
+                    autoFocus
+                    value={otherTexts[String(q.id)] ?? ''}
+                    onChange={e => setOther(q.id, e.target.value)}
+                    placeholder="Please specify…"
+                    className="w-full border border-orange-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-orange-50"
+                  />
+                )}
+              </div>
+            );
+          })()}
 
           {/* Yes / No */}
           {q.type === 'yesno' && (
