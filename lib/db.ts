@@ -1478,6 +1478,37 @@ if (!candidateColsV2.includes('employee_code')) {
     console.log(`[db] Synced profile photos for ${result.changes} employee(s) from users table.`);
 }
 
+// One-time migration: reset photos uploaded by admin users to uploader_id=0 so they
+// don't appear in any employee's "My Uploads". Safe to re-run (no-op when already 0).
+try {
+  const adminCodes  = getDbAdminCodes();
+  const rootCode    = (process.env.ROOT_ADMIN_CODE ?? '1423').trim();
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+  const allCodes    = [...new Set([...adminCodes, rootCode])];
+  const adminUserIds = new Set<number>();
+
+  for (const code of allCodes) {
+    const u = db.prepare('SELECT id FROM users WHERE employee_code = ?').get(code) as { id: number } | undefined;
+    if (u) adminUserIds.add(u.id);
+  }
+  for (const email of adminEmails) {
+    const u = db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(email) as { id: number } | undefined;
+    if (u) adminUserIds.add(u.id);
+  }
+
+  if (adminUserIds.size) {
+    const ids = [...adminUserIds];
+    const placeholders = ids.map(() => '?').join(',');
+    const result = db.prepare(
+      `UPDATE photos SET uploader_id = 0 WHERE uploader_id IN (${placeholders})`
+    ).run(...ids) as { changes: number };
+    if (result.changes > 0)
+      console.log(`[db] Reset ${result.changes} admin-uploaded photo(s) to uploader_id=0.`);
+  }
+} catch { /* ignore — safe to retry on next server start */ }
+
 export interface Employee {
   id: number;
   employee_code: string;

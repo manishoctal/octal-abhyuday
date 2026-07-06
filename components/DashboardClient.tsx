@@ -500,8 +500,8 @@ export default function DashboardClient({
 
       </div>
 
-      {/* ── CHECK-IN CTA (below hero, always visible) ─────────── */}
-      {isCheckedIn ? (
+      {/* ── CHECK-IN CTA (hidden once event is over) ─────────── */}
+      {!isEventOver && (isCheckedIn ? (
         <Link
           href="/me"
           className="flex items-center gap-3 w-full px-4 py-3.5 rounded-[18px] mb-5 active:scale-[0.98] transition-transform"
@@ -534,7 +534,7 @@ export default function DashboardClient({
           </span>
           <span className="text-white/60 text-[11px] font-medium relative z-10">· tap to mark attendance</span>
         </Link>
-      )}
+      ))}
 
       {/* ── UP NEXT ─────────────────────────────────────────── */}
       {schedule.length > 0 && <UpNext sessions={schedule} />}
