@@ -98,7 +98,7 @@ function Colon() {
   );
 }
 
-function Countdown({ target }: { target: Date }) {
+function Countdown({ target, isOver }: { target: Date; isOver?: boolean }) {
   const [t, setT] = useState<TL | null>(null);
   useEffect(() => {
     setT(calc(target));
@@ -108,12 +108,25 @@ function Countdown({ target }: { target: Date }) {
 
   if (!t) return <div className="h-[82px] mt-4" />;
 
-  if (t.done) return (
-    <div className="flex items-center gap-2 mt-4">
-      <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" style={{ boxShadow: '0 0 8px #4ade80' }} />
-      <span className="text-white font-bold text-sm">Event is live!</span>
-    </div>
-  );
+  if (t.done) {
+    if (isOver) return (
+      <div className="mt-4 flex items-center gap-2">
+        <span className="text-2xl leading-none">🏆</span>
+        <div>
+          <p className="text-white font-black text-sm leading-tight">Event Complete!</p>
+          <p className="text-[11px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Thank you for being part of it
+          </p>
+        </div>
+      </div>
+    );
+    return (
+      <div className="flex items-center gap-2 mt-4">
+        <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" style={{ boxShadow: '0 0 8px #4ade80' }} />
+        <span className="text-white font-bold text-sm">Event is live!</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-end gap-2 mt-4">
@@ -338,7 +351,6 @@ export default function DashboardClient({
       ? new Date(firstSession.start_time)
       : new Date(Date.now() + 7 * 86400000);
 
-  const anyLive    = votingState === 'live' || !!liveQa;
   const liveModules = { voting: votingState === 'live', qna: !!liveQa };
 
   // Poll module config every 10 s so admin changes reflect instantly
@@ -369,6 +381,9 @@ export default function DashboardClient({
     }
     return Math.round(((now - start) / (end - start)) * 100);
   })();
+
+  const isEventOver = eventProgress === 100 && eventDate.getTime() < Date.now();
+  const anyLive    = !isEventOver && (votingState === 'live' || !!liveQa);
 
   // Tile visibility + order
   const HREF_TO_KEY: Record<string, string> = {
@@ -452,34 +467,35 @@ export default function DashboardClient({
           </p>
 
           {/* Countdown */}
-          <Countdown target={eventDate} />
+          <Countdown target={eventDate} isOver={isEventOver} />
 
-          {/* Progress bar */}
-          <div className="mt-5">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-[0.15em]"
-                style={{ color: 'rgba(255,255,255,0.35)' }}>
-                Event Progress
-              </span>
-              <span className="text-[11px] font-black" style={{ color: '#FFD580' }}>{eventProgress}%</span>
+          {/* Progress bar — hidden once event is fully over */}
+          {!isEventOver && (
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[9px] font-bold uppercase tracking-[0.15em]"
+                  style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  Event Progress
+                </span>
+                <span className="text-[11px] font-black" style={{ color: '#FFD580' }}>{eventProgress}%</span>
+              </div>
+              <div className="h-[5px] rounded-full" style={{ background: 'rgba(255,255,255,0.20)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${eventProgress}%` }}
+                  transition={{ duration: 1.4, ease: 'easeOut' }}
+                  style={{
+                    background: 'linear-gradient(90deg,#FF7A00,#FF4F87,#FFD580)',
+                    boxShadow:  '0 0 10px rgba(255,122,0,0.45)',
+                  }}
+                />
+              </div>
             </div>
-            {/* Track is explicitly visible at 20% opacity */}
-            <div className="h-[5px] rounded-full" style={{ background: 'rgba(255,255,255,0.20)' }}>
-              <motion.div
-                className="h-full rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${eventProgress}%` }}
-                transition={{ duration: 1.4, ease: 'easeOut' }}
-                style={{
-                  background: 'linear-gradient(90deg,#FF7A00,#FF4F87,#FFD580)',
-                  boxShadow:  '0 0 10px rgba(255,122,0,0.45)',
-                }}
-              />
-            </div>
-          </div>
+          )}
 
-          {/* Today's highlights */}
-          <TodaysHighlights sessions={schedule} />
+          {/* Today's highlights — hidden once event is over */}
+          {!isEventOver && <TodaysHighlights sessions={schedule} />}
         </div>
 
       </div>

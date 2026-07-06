@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import VotingModule from '@/components/admin/VotingModule';
-
 export const dynamic = 'force-dynamic';
 
 export default function AdminVotingPage() {

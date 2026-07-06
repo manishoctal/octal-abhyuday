@@ -371,6 +371,7 @@ export function getUserVotes(userId: number, round: VotingRound): Record<Gender,
   return result;
 }
 
+
 export function getStats(round: VotingRound) {
   const totalVotes = (
     db.prepare('SELECT COUNT(*) AS n FROM votes WHERE round = ?').get(round) as { n: number }
@@ -707,7 +708,10 @@ export function setModuleOrder(order: string[]): void {
 export function resetVotes()          { db.prepare('DELETE FROM votes').run(); }
 export function resetAttendance()     { db.prepare('DELETE FROM attendance').run(); }
 export function resetPoints()         { db.prepare('DELETE FROM points').run(); }
-export function resetFeedback()       { db.prepare('DELETE FROM feedback').run(); }
+export function resetFeedback() {
+  db.prepare('DELETE FROM feedback').run();
+  db.prepare('DELETE FROM feedback_submissions').run();
+}
 export function resetGallery()        {
   db.prepare('DELETE FROM photo_tags').run();
   db.prepare('DELETE FROM face_embeddings').run();
@@ -872,6 +876,22 @@ db.exec(`
     suggestions TEXT,
     submitted_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS feedback_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    type TEXT NOT NULL DEFAULT 'rating',
+    options TEXT,
+    required INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS feedback_submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+    answers TEXT NOT NULL DEFAULT '{}',
+    submitted_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
   CREATE TABLE IF NOT EXISTS points (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -886,6 +906,24 @@ db.exec(`
 try {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_points_user_activity ON points(user_id, activity)');
 } catch { /* duplicates already exist — safe to ignore, INSERT OR IGNORE will handle dedup */ }
+
+// Seed default feedback questions on first run
+{
+  const count = (db.prepare('SELECT COUNT(*) as c FROM feedback_questions').get() as { c: number }).c;
+  if (count === 0) {
+    const ins = db.prepare(
+      'INSERT INTO feedback_questions (title, subtitle, type, required, sort_order) VALUES (?,?,?,?,?)'
+    );
+    const seed = db.transaction(() => {
+      ins.run('Overall Experience', 'How would you rate the event overall?', 'rating', 1, 0);
+      ins.run('Food Quality', 'Rate the food and refreshments', 'rating', 0, 1);
+      ins.run('Venue & Facilities', 'Rate the venue, seating, and facilities', 'rating', 0, 2);
+      ins.run('What did you enjoy most?', null, 'text', 0, 3);
+      ins.run('Suggestions for next year', 'Any improvements you would suggest?', 'text', 0, 4);
+    });
+    seed();
+  }
+}
 
 // Room allocation + Aadhar tables
 db.exec(`
@@ -1249,6 +1287,80 @@ export function listFeedback() {
   return db.prepare(
     'SELECT f.*, u.name, u.email FROM feedback f JOIN users u ON u.id=f.user_id ORDER BY f.submitted_at DESC'
   ).all() as (FeedbackRow & { name: string; email: string })[];
+}
+
+// ---------- feedback questions (configurable) ----------
+
+export type FeedbackQuestionType = 'rating' | 'text' | 'choice' | 'yesno';
+
+export interface FeedbackQuestion {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  type: FeedbackQuestionType;
+  options: string | null;
+  required: number;
+  sort_order: number;
+  active: number;
+}
+
+export interface FeedbackSubmission {
+  id: number;
+  user_id: number;
+  answers: string;
+  submitted_at: string;
+}
+
+export function listFeedbackQuestions(activeOnly = true): FeedbackQuestion[] {
+  return db.prepare(
+    `SELECT * FROM feedback_questions ${activeOnly ? 'WHERE active=1' : ''} ORDER BY sort_order ASC, id ASC`
+  ).all() as FeedbackQuestion[];
+}
+
+export function upsertFeedbackQuestion(data: {
+  id?: number; title: string; subtitle?: string | null; type: FeedbackQuestionType;
+  options?: string | null; required?: number; sort_order?: number; active?: number;
+}): number {
+  if (data.id) {
+    db.prepare(
+      'UPDATE feedback_questions SET title=?,subtitle=?,type=?,options=?,required=?,sort_order=?,active=? WHERE id=?'
+    ).run(data.title, data.subtitle ?? null, data.type, data.options ?? null,
+      data.required ?? 0, data.sort_order ?? 0, data.active ?? 1, data.id);
+    return data.id;
+  }
+  const max = (db.prepare('SELECT MAX(sort_order) as m FROM feedback_questions').get() as { m: number | null }).m ?? -1;
+  const info = db.prepare(
+    'INSERT INTO feedback_questions (title,subtitle,type,options,required,sort_order,active) VALUES (?,?,?,?,?,?,?)'
+  ).run(data.title, data.subtitle ?? null, data.type, data.options ?? null,
+    data.required ?? 0, max + 1, data.active ?? 1);
+  return Number(info.lastInsertRowid);
+}
+
+export function deleteFeedbackQuestion(id: number) {
+  db.prepare('DELETE FROM feedback_questions WHERE id=?').run(id);
+}
+
+export function reorderFeedbackQuestions(ids: number[]) {
+  const stmt = db.prepare('UPDATE feedback_questions SET sort_order=? WHERE id=?');
+  db.transaction(() => ids.forEach((id, i) => stmt.run(i, id)))();
+}
+
+export function getFeedbackSubmission(userId: number): FeedbackSubmission | undefined {
+  return db.prepare('SELECT * FROM feedback_submissions WHERE user_id=?').get(userId) as FeedbackSubmission | undefined;
+}
+
+export function upsertFeedbackSubmission(userId: number, answers: Record<string, unknown>) {
+  db.prepare(
+    `INSERT INTO feedback_submissions (user_id,answers) VALUES (?,?)
+     ON CONFLICT(user_id) DO UPDATE SET answers=excluded.answers,submitted_at=datetime('now')`
+  ).run(userId, JSON.stringify(answers));
+  awardPoints(userId, 'feedback', 20);
+}
+
+export function listFeedbackSubmissions() {
+  return db.prepare(
+    'SELECT fs.*,u.name,u.email FROM feedback_submissions fs JOIN users u ON u.id=fs.user_id ORDER BY fs.submitted_at DESC'
+  ).all() as (FeedbackSubmission & { name: string; email: string })[];
 }
 
 export function listAllUsers() {

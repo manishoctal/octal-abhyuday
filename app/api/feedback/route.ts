@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireUser, requireAdmin, isErrorResponse } from '@/lib/api-helpers';
-import { getFeedback, upsertFeedback, listFeedback } from '@/lib/db';
+import {
+  getFeedbackSubmission, upsertFeedbackSubmission,
+  listFeedbackSubmissions, listFeedbackQuestions,
+} from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,35 +11,28 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
 
   if (url.searchParams.get('admin') === '1') {
-    const adminOrErr = await requireAdmin();
-    if (isErrorResponse(adminOrErr)) return adminOrErr;
-    return NextResponse.json({ feedback: listFeedback() });
+    const admin = await requireAdmin();
+    if (isErrorResponse(admin)) return admin;
+    return NextResponse.json({
+      submissions: listFeedbackSubmissions(),
+      questions:   listFeedbackQuestions(false),
+    });
   }
 
-  const userOrErr = await requireUser();
-  if (isErrorResponse(userOrErr)) return userOrErr;
-  const existing = getFeedback(userOrErr.id);
-  return NextResponse.json({ feedback: existing ?? null });
+  const user = await requireUser();
+  if (isErrorResponse(user)) return user;
+  return NextResponse.json({ submission: getFeedbackSubmission(user.id) ?? null });
 }
 
 export async function POST(req: Request) {
-  const userOrErr = await requireUser();
-  if (isErrorResponse(userOrErr)) return userOrErr;
+  const user = await requireUser();
+  if (isErrorResponse(user)) return user;
 
-  const { overall_rating, session_ratings, food_rating, venue_rating, suggestions } = await req.json();
-
-  if (!overall_rating || overall_rating < 1 || overall_rating > 5) {
-    return NextResponse.json({ error: 'overall_rating must be 1–5' }, { status: 400 });
+  const { answers } = await req.json().catch(() => ({}));
+  if (!answers || typeof answers !== 'object') {
+    return NextResponse.json({ error: 'answers object required' }, { status: 400 });
   }
 
-  upsertFeedback(
-    userOrErr.id,
-    overall_rating,
-    session_ratings ?? {},
-    food_rating ?? null,
-    venue_rating ?? null,
-    suggestions ?? null
-  );
-
+  upsertFeedbackSubmission(user.id, answers);
   return NextResponse.json({ ok: true });
 }
