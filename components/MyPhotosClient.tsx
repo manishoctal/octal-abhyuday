@@ -230,26 +230,55 @@ export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearc
     if (fileRef.current) fileRef.current.value = '';
   }
 
-  const [downloading, setDownloading] = useState(false);
+  const [downloading, setDownloading]         = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadError, setDownloadError]       = useState('');
 
   async function downloadAll() {
     if (downloading) return;
     setDownloading(true);
+    setDownloadProgress(null);
+    setDownloadError('');
     try {
       const res = await fetch('/api/faces/search/zip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ photoIds: photos.map(p => p.id) }),
       });
-      if (!res.ok) return;
-      const blob = await res.blob();
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setDownloadError(errData.error ?? 'Download failed. Please try again.');
+        return;
+      }
+
+      // Stream the response so we can show real download progress.
+      // Content-Length is set by the server, enabling a real percentage.
+      const contentLength = Number(res.headers.get('Content-Length') ?? 0);
+      const reader = res.body!.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (contentLength > 0) {
+          setDownloadProgress(Math.round((received / contentLength) * 100));
+        }
+      }
+
+      const blob = new Blob(chunks, { type: 'application/zip' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `my-event-photos.zip`;
+      a.download = 'my-event-photos.zip';
       a.click();
       URL.revokeObjectURL(a.href);
+    } catch {
+      setDownloadError('Download failed. Please check your connection and try again.');
     } finally {
       setDownloading(false);
+      setDownloadProgress(null);
     }
   }
 
@@ -422,12 +451,19 @@ export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearc
                       className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-70 transition"
                       style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}>
                       {downloading ? (
-                        <>
-                          <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                          Preparing…
-                        </>
+                        downloadProgress !== null ? (
+                          <>
+                            <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                            {downloadProgress}%
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                            Preparing…
+                          </>
+                        )
                       ) : (
-                        <><Download size={14} /> Download All</>
+                        <><Download size={14} /> Download All ({photos.length})</>
                       )}
                     </button>
                   )}
@@ -435,6 +471,12 @@ export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearc
                     <Camera size={14} /> New Search
                   </button>
                 </div>
+                {downloadError && (
+                  <div className="flex items-start gap-2 bg-red-50 rounded-xl px-3 py-2.5 text-xs font-medium text-red-600">
+                    <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                    {downloadError}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

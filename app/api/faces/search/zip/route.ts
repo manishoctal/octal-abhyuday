@@ -82,8 +82,9 @@ export async function POST(req: Request) {
 
   return new Response(zipBuf as unknown as BodyInit, {
     headers: {
-      'Content-Type': 'application/zip',
+      'Content-Type':        'application/zip',
       'Content-Disposition': 'attachment; filename="my-event-photos.zip"',
+      'Content-Length':      String(zipBuf.length), // lets client show real download %
     },
   });
 }
