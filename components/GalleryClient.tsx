@@ -39,14 +39,14 @@ function dayKey(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
-interface PhotoGroup { label: string; photos: Photo[] }
+interface PhotoGroup { key: string; label: string; photos: Photo[] }
 
 function groupByDay(photos: Photo[]): PhotoGroup[] {
   const map = new Map<string, PhotoGroup>();
   for (const p of photos) {
     const key   = p.uploaded_at ? dayKey(p.uploaded_at) : 'unknown';
     const label = p.uploaded_at ? dayLabel(p.uploaded_at) : 'Earlier';
-    if (!map.has(key)) map.set(key, { label, photos: [] });
+    if (!map.has(key)) map.set(key, { key, label, photos: [] });
     map.get(key)!.photos.push(p);
   }
   return Array.from(map.values());
@@ -647,8 +647,8 @@ function UploadSheet({ onClose, onDone, useS3 }: { onClose: () => void; onDone: 
 
 /* ── main component ───────────────────────────────────────── */
 export default function GalleryClient({
-  initialApproved, initialMine, userId, useS3, faceSearchEnabled = true, uploadEnabled = true,
-}: { initialApproved: Photo[]; initialMine: Photo[]; userId: number; useS3: boolean; faceSearchEnabled?: boolean; uploadEnabled?: boolean }) {
+  initialApproved, initialMine, userId, useS3, faceSearchEnabled = true, uploadEnabled = true, downloadEnabled = true,
+}: { initialApproved: Photo[]; initialMine: Photo[]; userId: number; useS3: boolean; faceSearchEnabled?: boolean; uploadEnabled?: boolean; downloadEnabled?: boolean }) {
   const router = useRouter();
   const [filter, setFilter]               = useState<Filter>('all');
   const [lightboxPhotos, setLightboxPhotos] = useState<Photo[] | null>(null);
@@ -657,6 +657,13 @@ export default function GalleryClient({
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId]           = useState<number | null>(null);
   const [featureToast, setFeatureToast]   = useState('');
+
+  // ── Multi-select & zip download state ──────────────────────
+  const [selectMode, setSelectMode]           = useState(false);
+  const [selectedIds, setSelectedIds]         = useState<Set<number>>(new Set());
+  const [downloading, setDownloading]         = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadError, setDownloadError]     = useState('');
 
   function showComingSoon(msg: string) {
     setFeatureToast(msg);
@@ -673,6 +680,67 @@ export default function GalleryClient({
   const onUploadDone = useCallback(() => { mutateAll(); mutateMine(); }, [mutateAll, mutateMine]);
   const groups = groupByDay(photos);
 
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setDownloadError('');
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(photos.map(p => p.id)));
+  }
+
+  async function downloadSelected() {
+    if (downloading || selectedIds.size === 0) return;
+    setDownloading(true);
+    setDownloadProgress(null);
+    setDownloadError('');
+    try {
+      const res = await fetch('/api/faces/search/zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoIds: Array.from(selectedIds) }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setDownloadError(d.error ?? 'Download failed. Please try again.');
+        return;
+      }
+      const contentLength = Number(res.headers.get('Content-Length') ?? 0);
+      const reader = res.body!.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (contentLength > 0)
+          setDownloadProgress(Math.round((received / contentLength) * 100));
+      }
+      const blob = new Blob(chunks as BlobPart[], { type: 'application/zip' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `event-photos-${selectedIds.size}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      exitSelectMode();
+    } catch {
+      setDownloadError('Download failed. Check your connection and try again.');
+    } finally {
+      setDownloading(false);
+      setDownloadProgress(null);
+    }
+  }
+
   async function deletePhoto(id: number) {
     setConfirmDeleteId(null);
     setDeletingId(id);
@@ -687,6 +755,7 @@ export default function GalleryClient({
   }
 
   function openLightbox(groupPhotos: Photo[], idx: number) {
+    if (selectMode) return; // tap = toggle selection in select mode
     setLightboxPhotos(groupPhotos);
     setLightboxIndex(idx);
   }
@@ -720,30 +789,57 @@ export default function GalleryClient({
         </div>
       )}
 
-      {/* ── Sticky filter bar ── */}
-      <div className="sticky top-14 z-30 bg-white border-b border-slate-100 -mx-4 px-4 py-2 flex gap-2">
-        {(['all'] as Filter[]).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
-            style={filter === f ? { background: '#0F172A', color: 'white' } : { background: '#F1F5F9', color: '#64748B' }}>
-            {f === 'all' ? 'Photos' : 'My Uploads'}
-            {f === 'mine' && mine.length > 0 && <span className="ml-1.5 text-[10px] font-bold opacity-70">{mine.length}</span>}
-          </button>
-        ))}
-        {faceSearchEnabled ? (
-          <button onClick={() => router.push('/my-photos')}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
-            style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', color: 'white' }}>
-            <ScanFace size={14} /> Find Me
-          </button>
+      {/* ── Sticky filter / toolbar bar ── */}
+      <div className="sticky top-14 z-30 bg-white border-b border-slate-100 -mx-4 px-4 py-2 flex gap-2 items-center">
+        {!selectMode ? (
+          <>
+            {(['all'] as Filter[]).map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                style={filter === f ? { background: '#0F172A', color: 'white' } : { background: '#F1F5F9', color: '#64748B' }}>
+                {f === 'all' ? 'Photos' : 'My Uploads'}
+                {f === 'mine' && mine.length > 0 && <span className="ml-1.5 text-[10px] font-bold opacity-70">{mine.length}</span>}
+              </button>
+            ))}
+            {photos.length > 0 && downloadEnabled && (
+              <button
+                onClick={() => setSelectMode(true)}
+                className="px-3 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5"
+                style={{ background: '#F1F5F9', color: '#64748B' }}>
+                <CheckCircle2 size={14} /> Select
+              </button>
+            )}
+            {faceSearchEnabled ? (
+              <button onClick={() => router.push('/my-photos')}
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-all"
+                style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', color: 'white' }}>
+                <ScanFace size={14} /> Find Me
+              </button>
+            ) : (
+              <button onClick={() => showComingSoon('AI photo search will be enabled soon ✨')}
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold text-slate-400 bg-slate-100">
+                <ScanFace size={14} /> Find Me
+              </button>
+            )}
+          </>
         ) : (
-          <button onClick={() => showComingSoon('AI photo search will be enabled soon ✨')}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold text-slate-400 bg-slate-100">
-            <ScanFace size={14} /> Find Me
-          </button>
+          <>
+            <button onClick={exitSelectMode}
+              className="px-3 py-1.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-600 flex items-center gap-1.5">
+              <X size={14} /> Cancel
+            </button>
+            <span className="text-sm font-bold text-slate-800">
+              {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Tap to select'}
+            </span>
+            <button
+              onClick={selectedIds.size === photos.length ? () => setSelectedIds(new Set()) : selectAll}
+              className="ml-auto text-xs font-bold px-3 py-1.5 rounded-full transition-all"
+              style={{ background: '#EFF6FF', color: '#2563EB' }}>
+              {selectedIds.size === photos.length ? 'Deselect All' : 'Select All'}
+            </button>
+          </>
         )}
       </div>
-
 
       {/* ── Empty state ── */}
       {photos.length === 0 && (
@@ -762,49 +858,112 @@ export default function GalleryClient({
 
       {/* ── Photo grid — edge-to-edge, date grouped ── */}
       {groups.length > 0 && (
-        <div className="-mx-4 mt-3 pb-24">
+        <div className="-mx-4 mt-3 pb-44">
           {groups.map(group => (
-            <div key={group.label}>
+            <div key={group.key}>
               <div className="px-4 py-2 flex items-center justify-between">
                 <p className="text-[13px] font-semibold text-slate-800">{group.label}</p>
                 <p className="text-[11px] text-slate-400">{group.photos.length} photo{group.photos.length > 1 ? 's' : ''}</p>
               </div>
               <div className="grid grid-cols-3 gap-[2px]">
-                {group.photos.map((p, i) => (
-                  <button key={p.id} onClick={() => openLightbox(group.photos, i)}
-                    className="relative aspect-square overflow-hidden bg-slate-100 active:opacity-80 transition-opacity">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.thumbnail_url ?? p.url} alt={p.caption ?? ''} className="w-full h-full object-cover" loading="lazy"
-                      style={p.approved === -1 ? { filter: 'brightness(0.5) grayscale(0.5)' } : undefined} />
-                    <StatusDot approved={p.approved} />
-                    {/* Delete button — visible for own photos in any filter */}
-                    {p.uploader_id === userId && (
-                      <button
-                        onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
-                        disabled={deletingId === p.id}
-                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center disabled:opacity-40"
-                      >
-                        {deletingId === p.id
-                          ? <Loader2 size={13} color="white" className="animate-spin" />
-                          : <X size={13} color="white" strokeWidth={2.5} />}
-                      </button>
-                    )}
-                  </button>
-                ))}
+                {group.photos.map((p, i) => {
+                  const isSelected = selectedIds.has(p.id);
+                  return (
+                    <button key={p.id}
+                      onClick={() => selectMode ? toggleSelect(p.id) : openLightbox(group.photos, i)}
+                      className="relative aspect-square overflow-hidden bg-slate-100 transition-opacity"
+                      style={!selectMode ? undefined : { opacity: isSelected ? 1 : 0.6 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.thumbnail_url ?? p.url} alt={p.caption ?? ''} className="w-full h-full object-cover" loading="lazy"
+                        style={p.approved === -1 ? { filter: 'brightness(0.5) grayscale(0.5)' } : undefined} />
+                      <StatusDot approved={p.approved} />
+
+                      {/* Selection indicator */}
+                      {selectMode && (
+                        <div className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-[#FF7A00] border-[#FF7A00]'
+                            : 'bg-black/30 border-white'
+                        }`}>
+                          {isSelected && <CheckCircle2 size={14} color="white" strokeWidth={2.5} />}
+                        </div>
+                      )}
+
+                      {/* Selection overlay ring */}
+                      {selectMode && isSelected && (
+                        <div className="absolute inset-0 ring-2 ring-inset ring-[#FF7A00] pointer-events-none" />
+                      )}
+
+                      {/* Delete button — hidden in select mode */}
+                      {!selectMode && p.uploader_id === userId && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
+                          disabled={deletingId === p.id}
+                          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center disabled:opacity-40"
+                        >
+                          {deletingId === p.id
+                            ? <Loader2 size={13} color="white" className="animate-spin" />
+                            : <X size={13} color="white" strokeWidth={2.5} />}
+                        </button>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* ── FAB ── */}
-      <button
-        onClick={uploadEnabled ? () => setShowUpload(true) : () => showComingSoon('Photo upload will be open soon 📷')}
-        className="fixed right-5 bottom-20 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-        style={{ background: uploadEnabled ? '#FE9234' : '#CBD5E1' }}
-        aria-label="Add photos">
-        <Camera size={24} strokeWidth={1.8} color="white" />
-      </button>
+      {/* ── FAB (hidden in select mode) ── */}
+      {!selectMode && (
+        <button
+          onClick={uploadEnabled ? () => setShowUpload(true) : () => showComingSoon('Photo upload will be open soon 📷')}
+          className="fixed right-5 bottom-20 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+          style={{ background: uploadEnabled ? '#FE9234' : '#CBD5E1' }}
+          aria-label="Add photos">
+          <Camera size={24} strokeWidth={1.8} color="white" />
+        </button>
+      )}
+
+      {/* ── Select mode action bar ── */}
+      {selectMode && (
+        <div className="fixed bottom-16 inset-x-0 z-40 px-4 pb-2 pt-3 bg-white border-t border-slate-200 shadow-xl space-y-2"
+          style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
+          {downloadError && (
+            <div className="flex items-start gap-2 bg-red-50 rounded-xl px-3 py-2 text-xs font-medium text-red-600">
+              <AlertCircle size={13} className="shrink-0 mt-0.5" />
+              {downloadError}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={exitSelectMode}
+              className="py-3 px-5 rounded-2xl font-bold text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-95 transition-transform shrink-0">
+              Cancel
+            </button>
+            <button
+              onClick={downloadSelected}
+              disabled={selectedIds.size === 0 || downloading}
+              className="flex-1 py-3 rounded-2xl font-bold text-sm text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
+              style={{ background: selectedIds.size > 0 ? 'linear-gradient(135deg,#FF7A00,#FF4F87)' : '#CBD5E1' }}>
+              {downloading ? (
+                downloadProgress !== null ? (
+                  <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />{downloadProgress}%</>
+                ) : (
+                  <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />Preparing…</>
+                )
+              ) : (
+                <><Download size={15} />
+                  {selectedIds.size === 0
+                    ? 'Select photos to download'
+                    : `Download ${selectedIds.size} photo${selectedIds.size > 1 ? 's' : ''} as ZIP`}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Coming-soon toast */}
       {featureToast && (

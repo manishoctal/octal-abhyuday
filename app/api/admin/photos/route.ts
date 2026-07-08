@@ -10,6 +10,34 @@ export const dynamic = 'force-dynamic';
 
 const MAX_SIZE  = 200 * 1024 * 1024; // local disk only — S3 has no server-side limit
 const MAX_FILES = 1000;
+
+// ── Concurrency-limited face-tagging queue ──────────────────────────────────
+// All uploaded photos share this queue so the face service is never hit with
+// more than TAG_CONCURRENCY simultaneous requests (avoids localhost:3000 read
+// timeouts when uploading hundreds of photos at once).
+const TAG_CONCURRENCY = parseInt(process.env.FACE_TAG_CONCURRENCY ?? '3', 10);
+let _activeTagJobs = 0;
+const _tagQueue: Array<() => Promise<void>> = [];
+
+function drainTagQueue() {
+  while (_activeTagJobs < TAG_CONCURRENCY && _tagQueue.length > 0) {
+    const job = _tagQueue.shift()!;
+    _activeTagJobs++;
+    job().finally(() => { _activeTagJobs--; drainTagQueue(); });
+  }
+}
+
+function enqueueTag(id: number, base: string) {
+  _tagQueue.push(() =>
+    tagPhotoById(id, base)
+      .then(r => console.log(`[admin/photos/tag] photo ${id}: ${r.tagged} matched, ${r.faces} faces`))
+      .catch(err => {
+        console.error(`[admin/photos/tag] photo ${id} failed:`, err?.message ?? err);
+        setPhotoTagStatus(id, 'failed');
+      })
+  );
+  drainTagQueue();
+}
 const JPEG_VARIANTS = new Set(['jfif', 'jpe', 'jif', 'jfi', 'jpeg']);
 const DATA_DIR = () => process.env.DATA_DIR || path.join(process.cwd(), 'data');
 
@@ -39,14 +67,7 @@ export async function POST(req: Request) {
     for (const id of ids) {
       const photo = getPhotoById(id);
       if (photo) generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
-      setTimeout(() => {
-        tagPhotoById(id, base)
-          .then(r => console.log(`[admin/photos/tag] photo ${id}: ${r.tagged} matched, ${r.faces} faces`))
-          .catch(err => {
-            console.error(`[admin/photos/tag] photo ${id} failed:`, err?.message ?? err);
-            setPhotoTagStatus(id, 'failed');
-          });
-      }, 3000);
+      enqueueTag(id, base);
     }
 
     return NextResponse.json({ uploaded: ids.length });
@@ -77,14 +98,7 @@ export async function POST(req: Request) {
     const id  = addPhotoPreApproved(adminOrErr.id, adminOrErr.name, url, caption, null);
     const photo = getPhotoById(id);
     if (photo) generateThumbnailAsync(photo, DATA_DIR()).catch(() => {});
-    setTimeout(() => {
-      tagPhotoById(id, base)
-        .then(r => console.log(`[admin/photos/tag] photo ${id}: ${r.tagged} matched, ${r.faces} faces`))
-        .catch(err => {
-          console.error(`[admin/photos/tag] photo ${id} failed:`, err?.message ?? err);
-          setPhotoTagStatus(id, 'failed');
-        });
-    }, 3000);
+    enqueueTag(id, base);
   }
 
   return NextResponse.json({ uploaded: files.length });

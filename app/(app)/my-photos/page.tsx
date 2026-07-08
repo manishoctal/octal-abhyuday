@@ -14,7 +14,10 @@ export default async function MyPhotosPage() {
     <>
       <Header eventName={getAppState().event_name} title="My Photos" isAdmin={session.isAdmin} />
       <main className="max-w-lg mx-auto px-4 pt-4">
-        <MyPhotosClient faceSearchEnabled={getSetting('face_search_enabled') !== '0'} />
+        <MyPhotosClient
+          faceSearchEnabled={getSetting('face_search_enabled') !== '0'}
+          downloadEnabled={getSetting('photo_download_enabled') !== '0'}
+        />
       </main>
 
     </>

@@ -95,7 +95,7 @@ function AISteps({ phase }: { phase: Phase }) {
 }
 
 /* ── Main component ──────────────────────────────────────── */
-export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearchEnabled?: boolean }) {
+export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabled = true }: { faceSearchEnabled?: boolean; downloadEnabled?: boolean }) {
   const [phase, setPhase]       = useState<Phase>('idle');
   const [preview, setPreview]   = useState<string | null>(null);
   const [photos, setPhotos]     = useState<Photo[]>([]);
@@ -446,7 +446,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true }: { faceSearc
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {photos.length > 0 && (
+                  {photos.length > 0 && downloadEnabled && (
                     <button onClick={downloadAll} disabled={downloading}
                       className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-70 transition"
                       style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)' }}>

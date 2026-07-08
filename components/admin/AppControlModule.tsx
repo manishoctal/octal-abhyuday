@@ -7,7 +7,7 @@ import {
   CalendarDays, Trophy, ImageIcon, Vote, MessageSquare, BarChart3,
   QrCode, MapPin, Star, CheckCircle2, AlertTriangle, Wifi, WifiOff,
   ShieldCheck, ShieldPlus, ShieldOff, X, Crown, ChevronUp, ChevronDown, GripVertical,
-  Timer, Save, ScanFace,
+  Timer, Save, ScanFace, Download,
 } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -57,6 +57,7 @@ interface ConfigData {
   authConfig: { otp_email_enabled: boolean; smtp_ready: boolean; static_otp_code: string };
   faceSearchEnabled: boolean;
   uploadEnabled: boolean;
+  downloadEnabled: boolean;
   dbExportEnabled: boolean;
 }
 
@@ -73,9 +74,10 @@ export default function AppControlModule() {
   const { data: settingsData, mutate: mutateSettings } = useSWR<{ eventName: string; eventDate: string; totalRounds: number }>('/api/admin/settings', fetcher);
   const [tab, setTab]         = useState<'homepage'|'access'|'reset'|'push'|'login'|'admins'>('homepage');
   const [otpToggling, setOtpToggling]         = useState(false);
-  const [faceSearchToggling, setFaceSearchToggling] = useState(false);
-  const [uploadToggling, setUploadToggling]         = useState(false);
-  const [dbExportToggling, setDbExportToggling]     = useState(false);
+  const [faceSearchToggling, setFaceSearchToggling]   = useState(false);
+  const [uploadToggling, setUploadToggling]           = useState(false);
+  const [downloadToggling, setDownloadToggling]       = useState(false);
+  const [dbExportToggling, setDbExportToggling]       = useState(false);
   const [dbDownloading, setDbDownloading]           = useState(false);
   const [saving, setSaving]   = useState(false);
 
@@ -177,6 +179,17 @@ export default function AppControlModule() {
     });
     await mutate();
     setUploadToggling(false);
+  }
+
+  async function toggleDownload() {
+    setDownloadToggling(true);
+    await fetch('/api/admin/app-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo_download_enabled: !(data?.downloadEnabled ?? true) }),
+    });
+    await mutate();
+    setDownloadToggling(false);
   }
 
   async function toggleDbExport() {
@@ -509,6 +522,33 @@ export default function AppControlModule() {
                   : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
               }`}>
               {(data?.uploadEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
+            </button>
+          </div>
+
+          {/* ── Photo Download (ZIP) toggle ── */}
+          <div className="px-5 py-3.5 flex items-center gap-3 border-t border-slate-50">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
+              style={{ background: (data?.downloadEnabled ?? true) ? '#0F766E' : '#CBD5E1' }}>
+              <Download size={16} />
+            </div>
+            <div className="flex-1">
+              <p className={`font-semibold text-sm ${(data?.downloadEnabled ?? true) ? 'text-slate-800' : 'text-slate-400'}`}>
+                Photo Download (ZIP)
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {(data?.downloadEnabled ?? true)
+                  ? 'Employees can select & download photos as ZIP'
+                  : 'Download button hidden — enable to reduce server load'}
+              </p>
+            </div>
+            {downloadToggling && <RefreshCw size={13} className="text-slate-300 animate-spin" />}
+            <button onClick={toggleDownload} disabled={downloadToggling}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${
+                (data?.downloadEnabled ?? true)
+                  ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+              }`}>
+              {(data?.downloadEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
             </button>
           </div>
         </div>

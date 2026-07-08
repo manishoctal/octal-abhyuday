@@ -26,6 +26,7 @@ export default async function GalleryPage() {
           useS3={isS3Configured()}
           faceSearchEnabled={getSetting('face_search_enabled') !== '0'}
           uploadEnabled={getSetting('photo_upload_enabled') !== '0'}
+          downloadEnabled={getSetting('photo_download_enabled') !== '0'}
         />
       </main>
 
