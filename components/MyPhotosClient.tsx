@@ -187,11 +187,14 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
       const res = await fetch(photo.url);
       if (!res.ok) return;
       const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `event-photo-${photo.id}.jpg`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(a.href);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch { /* ignore */ }
   }
 
@@ -269,11 +272,14 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
       }
 
       const blob = new Blob(chunks as BlobPart[], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = 'my-event-photos.zip';
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(a.href);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
       setDownloadError('Download failed. Please check your connection and try again.');
     } finally {

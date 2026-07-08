@@ -190,11 +190,14 @@ function Lightbox({
       const res = await fetch(p.url);
       if (!res.ok) return;
       const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `photo-${p.id}.jpg`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(a.href);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch { /* ignore */ }
   }
 
@@ -727,11 +730,14 @@ export default function GalleryClient({
           setDownloadProgress(Math.round((received / contentLength) * 100));
       }
       const blob = new Blob(chunks as BlobPart[], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `event-photos-${selectedIds.size}.zip`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(a.href);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       exitSelectMode();
     } catch {
       setDownloadError('Download failed. Check your connection and try again.');
