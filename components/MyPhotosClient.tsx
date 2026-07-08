@@ -7,6 +7,7 @@ import {
   RefreshCw, ScanFace, Cpu, Search, Zap, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { isNative } from '@/lib/platform';
+import { triggerDownload } from '@/lib/client-download';
 
 interface Photo {
   id: number;
@@ -187,14 +188,8 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
       const res = await fetch(photo.url);
       if (!res.ok) return;
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `event-photo-${photo.id}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const ext = photo.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+      await triggerDownload(blob, `event-photo-${photo.id}.${ext}`, blob.type || 'image/jpeg');
     } catch { /* ignore */ }
   }
 
@@ -272,14 +267,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
       }
 
       const blob = new Blob(chunks as BlobPart[], { type: 'application/zip' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'my-event-photos.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await triggerDownload(blob, 'my-event-photos.zip', 'application/zip');
     } catch {
       setDownloadError('Download failed. Please check your connection and try again.');
     } finally {

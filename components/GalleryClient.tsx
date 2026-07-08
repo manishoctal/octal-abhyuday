@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, CloudUpload, AlertCircle, ScanFace, Loader2, Download, Trash2 } from 'lucide-react';
 import { useRealtime } from './useRealtime';
 import type { Photo } from '@/lib/db';
+import { triggerDownload } from '@/lib/client-download';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -190,14 +191,8 @@ function Lightbox({
       const res = await fetch(p.url);
       if (!res.ok) return;
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `photo-${p.id}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const ext = p.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+      await triggerDownload(blob, `photo-${p.id}.${ext}`, blob.type || 'image/jpeg');
     } catch { /* ignore */ }
   }
 
@@ -730,14 +725,7 @@ export default function GalleryClient({
           setDownloadProgress(Math.round((received / contentLength) * 100));
       }
       const blob = new Blob(chunks as BlobPart[], { type: 'application/zip' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `event-photos-${selectedIds.size}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await triggerDownload(blob, `event-photos-${selectedIds.size}.zip`, 'application/zip');
       exitSelectMode();
     } catch {
       setDownloadError('Download failed. Check your connection and try again.');

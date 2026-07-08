@@ -1,31 +1,22 @@
 /**
- * Lightweight client-side runtime detection.
- *
- * Capacitor injects `window.Capacitor` into the native WebView. We use that to
- * decide whether to register a Web-Push subscription (browser/PWA) or an FCM
- * device token (native), and tag it with the right `platform` when calling
- * /api/push/subscribe. The server stores both in `push_subscriptions`.
+ * Returns true when the app is running inside a Capacitor native shell
+ * (Android or iOS). False in a regular web browser / PWA.
  */
-
-type NativePlatform = 'web' | 'android' | 'ios';
-
-interface CapacitorGlobal {
-  isNativePlatform?: () => boolean;
-  getPlatform?: () => string;
-}
-
-function cap(): CapacitorGlobal | undefined {
-  if (typeof window === 'undefined') return undefined;
-  return (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor;
-}
-
-/** True inside the Capacitor native shell (Android/iOS app). */
 export function isNative(): boolean {
-  return cap()?.isNativePlatform?.() ?? false;
+  return typeof window !== 'undefined' &&
+    !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+      .Capacitor?.isNativePlatform?.();
 }
 
-/** 'web' in a browser/PWA, 'android' or 'ios' inside the native app. */
-export function getPlatform(): NativePlatform {
-  const p = cap()?.getPlatform?.();
-  return p === 'android' || p === 'ios' ? p : 'web';
+/**
+ * Returns the current platform: 'ios', 'android', or 'web'.
+ * Reads from the Capacitor global injected by the native WebView.
+ */
+export function getPlatform(): 'ios' | 'android' | 'web' {
+  if (typeof window === 'undefined') return 'web';
+  const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor;
+  const p = cap?.getPlatform?.();
+  if (p === 'ios') return 'ios';
+  if (p === 'android') return 'android';
+  return 'web';
 }
