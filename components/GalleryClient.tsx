@@ -102,6 +102,7 @@ function Lightbox({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [zoom, setZoom]                   = useState(1);
   const [pan, setPan]                     = useState({ x: 0, y: 0 });
+  const [dlState, setDlState]             = useState<'idle' | 'loading' | 'error'>('idle');
   const p = photos[cur];
 
   function resetZoom() { setZoom(1); setPan({ x: 0, y: 0 }); }
@@ -188,14 +189,23 @@ function Lightbox({
   }
 
   async function download() {
-    if (isNative()) { await downloadPhotoNative(p.id); return; }
+    if (dlState === 'loading') return;
+    setDlState('loading');
     try {
-      const res = await fetch(p.url);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const ext = p.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
-      await triggerDownload(blob, `photo-${p.id}.${ext}`, blob.type || 'image/jpeg');
-    } catch { /* ignore */ }
+      if (isNative()) {
+        await downloadPhotoNative(p.id);
+      } else {
+        const res = await fetch(p.url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const ext = p.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+        await triggerDownload(blob, `photo-${p.id}.${ext}`, blob.type || 'image/jpeg');
+      }
+      setDlState('idle');
+    } catch {
+      setDlState('error');
+      setTimeout(() => setDlState('idle'), 3000);
+    }
   }
 
   const isOwn = p.uploader_id === userId;
@@ -309,10 +319,13 @@ function Lightbox({
           )}
           <button
             onClick={download}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 active:bg-white/25 transition"
-            title="Download photo"
+            disabled={dlState === 'loading'}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 active:bg-white/25 transition disabled:opacity-60"
+            title={dlState === 'error' ? 'Download failed — tap to retry' : 'Download photo'}
           >
-            <Download size={18} color="white" />
+            {dlState === 'loading' ? <Loader2 size={18} color="white" className="animate-spin" /> :
+             dlState === 'error'   ? <AlertCircle size={18} color="#fca5a5" /> :
+             <Download size={18} color="white" />}
           </button>
         </div>
       </div>

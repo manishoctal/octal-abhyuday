@@ -185,14 +185,19 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
   }
 
   async function downloadPhoto(photo: Photo) {
-    if (isNative()) { await downloadPhotoNative(photo.id); return; }
     try {
-      const res = await fetch(photo.url);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const ext = photo.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
-      await triggerDownload(blob, `event-photo-${photo.id}.${ext}`, blob.type || 'image/jpeg');
-    } catch { /* ignore */ }
+      if (isNative()) {
+        await downloadPhotoNative(photo.id);
+      } else {
+        const res = await fetch(photo.url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const ext = photo.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+        await triggerDownload(blob, `event-photo-${photo.id}.${ext}`, blob.type || 'image/jpeg');
+      }
+    } catch {
+      setDownloadError('Download failed. Please try again.');
+    }
   }
 
   async function handleFile(file: File) {
