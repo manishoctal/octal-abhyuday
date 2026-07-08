@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Camera, Download, AlertTriangle, CheckCircle2, ImageOff,
+  Camera, Download, AlertTriangle, CheckCircle2, ImageOff, Image,
   RefreshCw, ScanFace, Cpu, Search, Zap, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { isNative } from '@/lib/platform';
-import { triggerDownload } from '@/lib/client-download';
+import { triggerDownload, openInSystemBrowser, downloadZipNative } from '@/lib/client-download';
 
 interface Photo {
   id: number;
@@ -103,7 +103,8 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
   const [errorMsg, setError]    = useState('');
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [comingSoonToast, setComingSoonToast] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef    = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   function handleDisabledClick() {
     setComingSoonToast(true);
@@ -184,6 +185,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
   }
 
   async function downloadPhoto(photo: Photo) {
+    if (isNative()) { openInSystemBrowser(photo.url); return; }
     try {
       const res = await fetch(photo.url);
       if (!res.ok) return;
@@ -234,6 +236,18 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
 
   async function downloadAll() {
     if (downloading) return;
+    // Capacitor: use token → system browser (no blob/share tricks)
+    if (isNative()) {
+      setDownloading(true);
+      try {
+        await downloadZipNative(photos.map(p => p.id));
+      } catch {
+        setDownloadError('Download failed. Please try again.');
+      } finally {
+        setDownloading(false);
+      }
+      return;
+    }
     setDownloading(true);
     setDownloadProgress(null);
     setDownloadError('');
@@ -316,11 +330,40 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
     }
   }
 
+  async function uploadFromGallery() {
+    if (isNative()) {
+      try {
+        const { Camera: CapCamera, CameraSource, CameraResultType } =
+          await import('@capacitor/camera');
+        const photo = await CapCamera.getPhoto({
+          quality:            90,
+          source:             CameraSource.Photos,
+          resultType:         CameraResultType.DataUrl,
+          correctOrientation: true,
+        });
+        if (!photo.dataUrl) return;
+        const fetchRes = await fetch(photo.dataUrl);
+        const blob     = await fetchRes.blob();
+        const file     = new File([blob], 'photo.jpg', { type: blob.type || 'image/jpeg' });
+        handleFile(file);
+      } catch (e: unknown) {
+        if (e instanceof Error && !e.message.includes('cancelled') && !e.message.includes('canceled')) {
+          setError('Could not open gallery. Please try again.');
+          setPhase('error');
+        }
+      }
+    } else {
+      galleryRef.current?.click();
+    }
+  }
+
   // faceSearchEnabled=false: show the page but with a disabled CTA and toast
 
   return (
     <div className="space-y-4 pb-24">
       <input ref={fileRef} type="file" accept="image/*" capture="user" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+      <input ref={galleryRef} type="file" accept="image/*" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
 
       {/* Main card */}
@@ -351,23 +394,39 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
                 </div>
                 {faceSearchEnabled ? (
                   <>
-                    <button
-                      onClick={takeSelfie}
-                      className="w-full py-4 rounded-2xl font-black text-white text-base flex items-center justify-center gap-2"
-                      style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', boxShadow: '0 8px 24px rgba(255,122,0,0.3)' }}
-                    >
-                      <Camera size={20} /> Take Selfie
-                    </button>
-                    <p className="text-xs text-slate-400">Your selfie is used only for matching — never stored</p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={takeSelfie}
+                        className="flex-1 py-4 rounded-2xl font-black text-white text-sm flex items-center justify-center gap-2"
+                        style={{ background: 'linear-gradient(135deg,#FF7A00,#FF4F87)', boxShadow: '0 8px 24px rgba(255,122,0,0.3)' }}
+                      >
+                        <Camera size={18} /> Take Selfie
+                      </button>
+                      <button
+                        onClick={uploadFromGallery}
+                        className="flex-1 py-4 rounded-2xl font-black text-slate-700 text-sm flex items-center justify-center gap-2 bg-slate-100"
+                      >
+                        <Image size={18} /> Upload Photo
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-400">Your photo is used only for matching — never stored</p>
                   </>
                 ) : (
                   <>
-                    <button
-                      onClick={handleDisabledClick}
-                      className="w-full py-4 rounded-2xl font-black text-slate-400 text-base flex items-center justify-center gap-2 bg-slate-100"
-                    >
-                      <Camera size={20} /> Take Selfie
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleDisabledClick}
+                        className="flex-1 py-4 rounded-2xl font-black text-slate-400 text-sm flex items-center justify-center gap-2 bg-slate-100"
+                      >
+                        <Camera size={18} /> Take Selfie
+                      </button>
+                      <button
+                        onClick={handleDisabledClick}
+                        className="flex-1 py-4 rounded-2xl font-black text-slate-400 text-sm flex items-center justify-center gap-2 bg-slate-100"
+                      >
+                        <Image size={18} /> Upload Photo
+                      </button>
+                    </div>
                     <p className="text-xs text-amber-500 font-semibold text-center">This feature will be enabled soon ✨</p>
                     {comingSoonToast && (
                       <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-xl max-w-[92vw] text-center">

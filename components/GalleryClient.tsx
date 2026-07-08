@@ -6,7 +6,8 @@ import useSWR from 'swr';
 import { ImagePlus, X, Plus, CheckCircle2, Camera, ChevronLeft, ChevronRight, CloudUpload, AlertCircle, ScanFace, Loader2, Download, Trash2 } from 'lucide-react';
 import { useRealtime } from './useRealtime';
 import type { Photo } from '@/lib/db';
-import { triggerDownload } from '@/lib/client-download';
+import { triggerDownload, openInSystemBrowser, downloadZipNative } from '@/lib/client-download';
+import { isNative } from '@/lib/platform';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -187,6 +188,8 @@ function Lightbox({
   }
 
   async function download() {
+    // Capacitor: open directly in system browser — user can save from there
+    if (isNative()) { openInSystemBrowser(p.url); return; }
     try {
       const res = await fetch(p.url);
       if (!res.ok) return;
@@ -698,6 +701,19 @@ export default function GalleryClient({
 
   async function downloadSelected() {
     if (downloading || selectedIds.size === 0) return;
+    // Capacitor: use token → system browser download (no blob needed)
+    if (isNative()) {
+      setDownloading(true);
+      try {
+        await downloadZipNative(Array.from(selectedIds));
+        exitSelectMode();
+      } catch {
+        setDownloadError('Download failed. Please try again.');
+      } finally {
+        setDownloading(false);
+      }
+      return;
+    }
     setDownloading(true);
     setDownloadProgress(null);
     setDownloadError('');

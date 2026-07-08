@@ -1,22 +1,61 @@
 /**
- * Cross-platform file download that works in both:
- *   - Desktop/mobile browsers: anchor click with blob URL
- *   - Capacitor WebViews (iOS/Android): Web Share API with native share sheet
+ * Cross-platform download helpers.
  *
- * On iOS WKWebView and Android WebView, `<a download>` is silently ignored.
- * navigator.share({ files }) opens the native OS share sheet where the user
- * can save to Photos, Files, WhatsApp, etc.
+ * Capacitor WebViews (iOS WKWebView / Android WebView) do NOT support:
+ *   - <a download> with blob: URLs
+ *   - navigator.share({ files }) when called after an async fetch (gesture context lost on iOS)
  *
- * Usage:
- *   const blob = await res.blob();
- *   await triggerDownload(blob, 'photo.jpg', 'image/jpeg');
+ * The reliable Capacitor path:
+ *   - Single file  → window.open(absoluteUrl, '_system') opens Safari/Chrome where the
+ *                    user can save/download the file natively.
+ *   - ZIP          → POST to /api/photos/zip-token to get a short-lived token, then
+ *                    window.open('/api/photos/zip/download/[token]', '_system').
+ *                    The system browser makes a plain GET, receives Content-Disposition:
+ *                    attachment, and handles the download natively.
+ *
+ * On desktop web, the blob + anchor approach works fine.
+ */
+
+/** Resolves a relative URL to an absolute one using the current origin. */
+function toAbsolute(url: string): string {
+  if (url.startsWith('http')) return url;
+  return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+/**
+ * Opens a URL in the device's system browser (Safari / Chrome).
+ * Used in Capacitor for single-file downloads where we already have a URL.
+ */
+export function openInSystemBrowser(url: string): void {
+  window.open(toAbsolute(url), '_system');
+}
+
+/**
+ * Downloads selected photos as a ZIP via the system browser.
+ * POSTs photoIds to get a short-lived token, then opens the GET download URL.
+ * Used in Capacitor native builds only.
+ */
+export async function downloadZipNative(photoIds: number[]): Promise<void> {
+  const res = await fetch('/api/photos/zip-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoIds }),
+  });
+  if (!res.ok) throw new Error('Failed to create download token');
+  const { token } = await res.json();
+  window.open(toAbsolute(`/api/photos/zip/download/${token}`), '_system');
+}
+
+/**
+ * Triggers a file download from a Blob on desktop/web browsers.
+ * Falls back to Web Share API when available (some mobile browsers).
  */
 export async function triggerDownload(
   blob: Blob,
   filename: string,
   mimeType: string,
 ): Promise<void> {
-  // Web Share API — works in Capacitor WebViews; opens native share sheet
+  // Web Share API with files — works in some browsers/PWA contexts
   if (typeof navigator !== 'undefined' && navigator.canShare) {
     try {
       const file = new File([blob], filename, { type: mimeType });
@@ -25,13 +64,11 @@ export async function triggerDownload(
         return;
       }
     } catch (e) {
-      // AbortError = user dismissed the share sheet — treat as success
-      if ((e as Error)?.name === 'AbortError') return;
-      // Any other error falls through to the anchor approach
+      if ((e as Error)?.name === 'AbortError') return; // user cancelled
     }
   }
 
-  // Fallback: anchor click — works in desktop browsers
+  // Anchor click — reliable in desktop browsers
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
