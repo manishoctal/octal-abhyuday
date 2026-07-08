@@ -9,6 +9,34 @@ export const dynamic = 'force-dynamic';
 
 const DATA_DIR = () => process.env.DATA_DIR || path.join(process.cwd(), 'data');
 
+// ── Per-user zip download rate limiter ────────────────────────────────────────
+// Configurable via env vars; defaults: 5 downloads per 10-minute window.
+const RATE_LIMIT  = parseInt(process.env.ZIP_RATE_LIMIT  ?? '5',   10);  // max downloads
+const RATE_WINDOW = parseInt(process.env.ZIP_RATE_WINDOW ?? '600', 10);  // seconds
+
+interface RateEntry { count: number; windowStart: number }
+const rateLimiter = new Map<number, RateEntry>();
+
+function checkRateLimit(userId: number): { allowed: boolean; remaining: number; resetInSec: number } {
+  const now        = Date.now();
+  const windowMs   = RATE_WINDOW * 1000;
+  const entry      = rateLimiter.get(userId);
+
+  if (!entry || now - entry.windowStart >= windowMs) {
+    // New or expired window — reset
+    rateLimiter.set(userId, { count: 1, windowStart: now });
+    return { allowed: true, remaining: RATE_LIMIT - 1, resetInSec: RATE_WINDOW };
+  }
+
+  if (entry.count >= RATE_LIMIT) {
+    const resetInSec = Math.ceil((entry.windowStart + windowMs - now) / 1000);
+    return { allowed: false, remaining: 0, resetInSec };
+  }
+
+  entry.count++;
+  return { allowed: true, remaining: RATE_LIMIT - entry.count, resetInSec: Math.ceil((entry.windowStart + windowMs - now) / 1000) };
+}
+
 async function readPhotoBuffer(url: string): Promise<Buffer | null> {
   try {
     if (url.startsWith('http')) {
@@ -48,6 +76,22 @@ async function readPhotoBuffer(url: string): Promise<Buffer | null> {
 export async function POST(req: Request) {
   const userOrErr = await requireUser();
   if (isErrorResponse(userOrErr)) return userOrErr;
+
+  const { allowed, remaining, resetInSec } = checkRateLimit(userOrErr.id);
+  if (!allowed) {
+    return Response.json(
+      { error: `Download limit reached. You can download up to ${RATE_LIMIT} zips every ${Math.round(RATE_WINDOW / 60)} minutes. Try again in ${resetInSec}s.` },
+      {
+        status: 429,
+        headers: {
+          'Retry-After':               String(resetInSec),
+          'X-RateLimit-Limit':         String(RATE_LIMIT),
+          'X-RateLimit-Remaining':     '0',
+          'X-RateLimit-Reset':         String(Math.ceil(Date.now() / 1000) + resetInSec),
+        },
+      },
+    );
+  }
 
   const { photoIds } = await req.json().catch(() => ({}));
   if (!Array.isArray(photoIds) || photoIds.length === 0) {
