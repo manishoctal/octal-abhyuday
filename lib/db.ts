@@ -949,7 +949,7 @@ db.exec(`
   );
 `);
 
-// Add thumbnail_url and face_tag_status to photos if missing
+// Add thumbnail_url, face_tag_status, and is_admin_upload to photos if missing
 {
   const photoCols = (db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]).map(c => c.name);
   if (!photoCols.includes('thumbnail_url')) {
@@ -957,6 +957,9 @@ db.exec(`
   }
   if (!photoCols.includes('face_tag_status')) {
     db.exec("ALTER TABLE photos ADD COLUMN face_tag_status TEXT DEFAULT NULL");
+  }
+  if (!photoCols.includes('is_admin_upload')) {
+    db.exec('ALTER TABLE photos ADD COLUMN is_admin_upload INTEGER NOT NULL DEFAULT 0');
   }
 }
 
@@ -1051,9 +1054,15 @@ export function deleteFaceEmbedding(employeeId: number) {
 // ---------- photo tags ----------
 
 export function addPhotoTag(photoId: number, employeeId: number, confidence: number) {
-  db.prepare(
-    'INSERT OR IGNORE INTO photo_tags (photo_id, employee_id, confidence) VALUES (?, ?, ?)'
-  ).run(photoId, employeeId, confidence);
+  try {
+    db.prepare(
+      'INSERT OR IGNORE INTO photo_tags (photo_id, employee_id, confidence) VALUES (?, ?, ?)'
+    ).run(photoId, employeeId, confidence);
+  } catch (e: any) {
+    // Stale face embedding pointing to a deleted employee — safe to skip.
+    if (e?.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') return;
+    throw e;
+  }
 }
 
 export function getPhotosByEmployeeId(employeeId: number): Photo[] {
@@ -1200,6 +1209,7 @@ export interface Photo {
   id: number; uploader_id: number; uploader_name: string; url: string;
   thumbnail_url: string | null; caption: string | null; session_tag: string | null;
   approved: number; uploaded_at: string; face_tag_status: string | null;
+  is_admin_upload: number;
 }
 export function setPhotoThumbnail(id: number, thumbnailUrl: string) {
   db.prepare('UPDATE photos SET thumbnail_url=? WHERE id=?').run(thumbnailUrl, id);
@@ -1232,9 +1242,9 @@ export function listPhotos(approvedOnly = true): Photo[] {
       : 'SELECT * FROM photos ORDER BY approved ASC, uploaded_at DESC'
   ).all() as Photo[];
 }
-/** All photos by a specific user (approved=1, pending=0, rejected=-1). */
+/** All photos by a specific user — excludes admin-panel uploads. */
 export function listUserPhotos(userId: number): Photo[] {
-  return db.prepare('SELECT * FROM photos WHERE uploader_id=? ORDER BY uploaded_at DESC').all(userId) as Photo[];
+  return db.prepare('SELECT * FROM photos WHERE uploader_id=? AND is_admin_upload=0 ORDER BY uploaded_at DESC').all(userId) as Photo[];
 }
 export function addPhoto(uploaderId: number, uploaderName: string, url: string, caption: string | null, sessionTag: string | null) {
   // Auto-approved — no moderation queue for user uploads
@@ -1243,8 +1253,8 @@ export function addPhoto(uploaderId: number, uploaderName: string, url: string, 
   return r.lastInsertRowid as number;
 }
 export function addPhotoPreApproved(uploaderId: number, uploaderName: string, url: string, caption: string | null, sessionTag: string | null) {
-  // Use uploader_id=0 so admin-panel uploads don't appear in any employee's "My Uploads"
-  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag, approved) VALUES (?,?,?,?,?,1)').run(0, uploaderName, url, caption, sessionTag);
+  // is_admin_upload=1 marks this as an admin upload so it doesn't appear in employees' "My Uploads"
+  const r = db.prepare('INSERT INTO photos (uploader_id, uploader_name, url, caption, session_tag, approved, is_admin_upload) VALUES (?,?,?,?,?,1,1)').run(uploaderId, uploaderName, url, caption, sessionTag);
   return r.lastInsertRowid as number;
 }
 export function disablePhoto(id: number) {
@@ -1502,10 +1512,10 @@ try {
     const ids = Array.from(adminUserIds);
     const placeholders = ids.map(() => '?').join(',');
     const result = db.prepare(
-      `UPDATE photos SET uploader_id = 0 WHERE uploader_id IN (${placeholders})`
+      `UPDATE photos SET is_admin_upload = 1 WHERE uploader_id IN (${placeholders}) AND is_admin_upload = 0`
     ).run(...ids) as { changes: number };
     if (result.changes > 0)
-      console.log(`[db] Reset ${result.changes} admin-uploaded photo(s) to uploader_id=0.`);
+      console.log(`[db] Marked ${result.changes} admin-uploaded photo(s) with is_admin_upload=1.`);
   }
 } catch { /* ignore — safe to retry on next server start */ }
 
