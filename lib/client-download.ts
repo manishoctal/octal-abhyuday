@@ -31,6 +31,23 @@ export function openInSystemBrowser(url: string): void {
 }
 
 /**
+ * Downloads a single photo via the system browser.
+ * Creates a short-lived token, then opens the GET download URL which responds
+ * with Content-Disposition: attachment so the system browser saves the file.
+ * Used in Capacitor native builds only.
+ */
+export async function downloadPhotoNative(photoId: number): Promise<void> {
+  const res = await fetch('/api/photos/zip-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoIds: [photoId] }),
+  });
+  if (!res.ok) throw new Error('Failed to create download token');
+  const { token } = await res.json();
+  window.open(toAbsolute(`/api/photos/single/download/${token}`), '_system');
+}
+
+/**
  * Downloads selected photos as a ZIP via the system browser.
  * POSTs photoIds to get a short-lived token, then opens the GET download URL.
  * Used in Capacitor native builds only.

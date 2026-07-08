@@ -7,7 +7,7 @@ import {
   RefreshCw, ScanFace, Cpu, Search, Zap, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { isNative } from '@/lib/platform';
-import { triggerDownload, openInSystemBrowser, downloadZipNative } from '@/lib/client-download';
+import { triggerDownload, downloadPhotoNative, downloadZipNative } from '@/lib/client-download';
 
 interface Photo {
   id: number;
@@ -185,7 +185,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
   }
 
   async function downloadPhoto(photo: Photo) {
-    if (isNative()) { openInSystemBrowser(photo.url); return; }
+    if (isNative()) { await downloadPhotoNative(photo.id); return; }
     try {
       const res = await fetch(photo.url);
       if (!res.ok) return;
@@ -196,6 +196,18 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
   }
 
   async function handleFile(file: File) {
+    const MAX_MB = 15;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setError(`Photo is too large (max ${MAX_MB} MB). Please choose a smaller image.`);
+      setPhase('error');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file (JPEG, PNG, etc.).');
+      setPhase('error');
+      return;
+    }
+
     if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
     setError('');
