@@ -23,7 +23,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Only .apk files are allowed' }, { status: 400 });
   }
 
-  const dir = path.join(process.cwd(), 'public', 'releases');
+  const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+  const dir = path.join(dataDir, 'releases');
   fs.mkdirSync(dir, { recursive: true });
 
   // Delete old APK files to free disk space
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   const buffer = Buffer.from(await file.arrayBuffer());
   fs.writeFileSync(path.join(dir, filename), buffer);
 
-  return NextResponse.json({ publicUrl: `/releases/${filename}` });
+  return NextResponse.json({ publicUrl: `/api/apk/${filename}` });
   } catch (e) {
     console.error('[apk-upload]', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
