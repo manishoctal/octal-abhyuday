@@ -180,7 +180,7 @@ export default function AdminShell({
   const mobileTitle = activeItem?.label ?? (pathname === '/admin' ? 'Dashboard' : 'Admin');
 
   return (
-    <div className="flex h-dvh bg-slate-50 overflow-hidden">
+    <div className="admin-shell flex h-dvh bg-slate-50 overflow-hidden">
       {/* Desktop sidebar — always visible md+ */}
       <div className="hidden md:flex">
         <Sidebar eventName={eventName} adminName={adminName} />

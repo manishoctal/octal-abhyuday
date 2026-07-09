@@ -78,3 +78,18 @@ export async function presignUpload(
   });
   return getSignedUrl(buildClient(), command, { expiresIn });
 }
+
+/** Uploads bytes already held server-side (no presign round-trip needed). */
+export async function uploadBuffer(
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<string> {
+  await buildClient().send(new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME!,
+    Key:    key,
+    Body:   body,
+    ContentType: contentType,
+  }));
+  return getPublicUrl(key);
+}

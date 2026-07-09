@@ -1,8 +1,37 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getAllFaceEmbeddings, getPhotosByEmployeeId } from '@/lib/db';
+import { isS3Configured, uploadBuffer, normalizeExt } from '@/lib/s3';
+import fs from 'fs';
+import path from 'path';
 
 const FACE_SERVICE = process.env.FACE_SERVICE_URL ?? 'http://localhost:8001';
+const DATA_DIR = () => process.env.DATA_DIR || path.join(process.cwd(), 'data');
+
+/**
+ * Persists the selfie a user submitted for "Find Me" search — kept separate
+ * from the event gallery (own S3 prefix / local folder) since these are
+ * search-input photos, not event photos, and shouldn't appear in the gallery.
+ * Fire-and-forget: never block or fail the search on a storage error.
+ */
+async function saveFindMeSelfie(selfie: File, userId: number): Promise<void> {
+  try {
+    const buffer = Buffer.from(await selfie.arrayBuffer());
+    const ext    = normalizeExt(selfie.name || 'selfie.jpg');
+    const name   = `${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const contentType = selfie.type || 'image/jpeg';
+
+    if (isS3Configured()) {
+      await uploadBuffer(`abhyuday-2026/find-me-selfies/${name}`, buffer, contentType);
+    } else {
+      const dir = path.join(DATA_DIR(), 'find-me-selfies');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, name), buffer);
+    }
+  } catch (e) {
+    console.error('[find-me] failed to save selfie:', e);
+  }
+}
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -17,6 +46,8 @@ export async function POST(req: Request) {
 
   const selfie = formData.get('selfie') as File | null;
   if (!selfie) return NextResponse.json({ error: 'selfie field required' }, { status: 400 });
+
+  saveFindMeSelfie(selfie, session.id).catch(() => {});
 
   const allEmbeddings = getAllFaceEmbeddings();
   if (allEmbeddings.length === 0) {

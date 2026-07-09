@@ -27,9 +27,23 @@ body {
   padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
-/* ── Scrollbar — hidden, native feel ────────────────────── */
+/* ── Scrollbar — hidden, native feel (employee app) ─────── */
 ::-webkit-scrollbar { display: none; }
 * { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Scrollbar — visible in admin (desktop, long lists) ─── */
+.admin-shell ::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+.admin-shell ::-webkit-scrollbar-track { background: transparent; }
+.admin-shell ::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 8px;
+}
+.admin-shell ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+.admin-shell * { -ms-overflow-style: auto; scrollbar-width: thin; }
 
 /* ── Touch — remove tap flash ───────────────────────────── */
 * { -webkit-tap-highlight-color: transparent; }

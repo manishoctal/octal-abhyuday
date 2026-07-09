@@ -29,6 +29,26 @@ const STEPS: { phase: Phase; icon: React.ElementType; label: string }[] = [
 
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
+/**
+ * Persists the last Find-Me result so it survives a remount — e.g. when the
+ * hardware back button navigates away from /my-photos and the user returns.
+ * Only photo metadata is stored; the selfie preview (a blob: URL) doesn't
+ * survive a navigation so it's intentionally dropped on restore.
+ */
+const RESULT_STORAGE_KEY = 'findme:lastResult';
+
+function loadStoredPhotos(): Photo[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(RESULT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.photos) ? parsed.photos : [];
+  } catch {
+    return [];
+  }
+}
+
 /* ── Scan overlay (placed on the selfie preview) ─────────── */
 function ScanOverlay() {
   return (
@@ -97,9 +117,9 @@ function AISteps({ phase }: { phase: Phase }) {
 
 /* ── Main component ──────────────────────────────────────── */
 export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabled = true }: { faceSearchEnabled?: boolean; downloadEnabled?: boolean }) {
-  const [phase, setPhase]       = useState<Phase>('idle');
+  const [phase, setPhase]       = useState<Phase>(() => loadStoredPhotos().length > 0 ? 'done' : 'idle');
   const [preview, setPreview]   = useState<string | null>(null);
-  const [photos, setPhotos]     = useState<Photo[]>([]);
+  const [photos, setPhotos]     = useState<Photo[]>(() => loadStoredPhotos());
   const [errorMsg, setError]    = useState('');
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [comingSoonToast, setComingSoonToast] = useState(false);
@@ -122,6 +142,41 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
 
   // Reset zoom when photo changes
   useEffect(() => { lbResetZoom(); }, [lightbox]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist results so a hardware-back navigation away from this page doesn't
+  // force the user to redo the AI search when they come back.
+  useEffect(() => {
+    if (phase === 'done' && photos.length > 0) {
+      try {
+        sessionStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify({ photos }));
+      } catch { /* storage unavailable — non-fatal */ }
+    }
+  }, [phase, photos]);
+
+  // Make the hardware/browser back button close the lightbox instead of
+  // navigating away from /my-photos (which would unmount this component and
+  // destroy the in-memory search results).
+  const lbHistoryOpen = useRef(false);
+  useEffect(() => {
+    if (lightbox !== null && !lbHistoryOpen.current) {
+      window.history.pushState({ findMeLightbox: true }, '');
+      lbHistoryOpen.current = true;
+    } else if (lightbox === null && lbHistoryOpen.current) {
+      lbHistoryOpen.current = false;
+      window.history.back();
+    }
+  }, [lightbox]);
+
+  useEffect(() => {
+    function onPopState() {
+      if (lbHistoryOpen.current) {
+        lbHistoryOpen.current = false;
+        setLightbox(null);
+      }
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // Keyboard nav for lightbox
   useEffect(() => {
@@ -245,6 +300,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
     if (preview) URL.revokeObjectURL(preview);
     setPhase('idle'); setPreview(null); setPhotos([]); setError('');
     if (fileRef.current) fileRef.current.value = '';
+    try { sessionStorage.removeItem(RESULT_STORAGE_KEY); } catch { /* storage unavailable — non-fatal */ }
   }
 
   const [downloading, setDownloading]         = useState(false);
