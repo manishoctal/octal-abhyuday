@@ -1,19 +1,13 @@
 /**
  * Cross-platform download helpers.
  *
- * Capacitor WebViews (iOS WKWebView / Android WebView) do NOT support:
- *   - <a download> with blob: URLs
- *   - navigator.share({ files }) when called after an async fetch (gesture context lost on iOS)
+ * Native (Android/iOS): uses @capacitor/browser to open the download URL in the
+ * system browser.  The server responds with Content-Disposition: attachment and a
+ * short-lived token so the browser can save the file without requiring a session cookie.
+ * Single photos → /api/photos/single/download/[token]
+ * ZIP bundles   → /api/photos/zip/download/[token]
  *
- * The reliable Capacitor path:
- *   - Single file  → window.open(absoluteUrl, '_system') opens Safari/Chrome where the
- *                    user can save/download the file natively.
- *   - ZIP          → POST to /api/photos/zip-token to get a short-lived token, then
- *                    window.open('/api/photos/zip/download/[token]', '_system').
- *                    The system browser makes a plain GET, receives Content-Disposition:
- *                    attachment, and handles the download natively.
- *
- * On desktop web, the blob + anchor approach works fine.
+ * Desktop web: blob + anchor click (standard browser download).
  */
 
 import { getPlatform } from '@/lib/platform';
@@ -25,36 +19,21 @@ function toAbsolute(url: string): string {
 }
 
 /**
- * Opens a URL in an external browser.
+ * Opens a URL in the system browser.
  *
- * Android: uses an Intent URL (`intent://`) which Android's WebView intercepts
- * via shouldOverrideUrlLoading and launches Chrome directly.  Chrome then handles
- * the Content-Disposition: attachment response and saves the file to Downloads.
- *
- * iOS: `window.open(_system)` is handled by WKWebView/Capacitor to open Safari.
- * Safari respects Content-Disposition: attachment and offers a Download button.
- *
- * We do NOT use window.open(_system) on Android because Capacitor 6 without
- * @capacitor/browser silently drops _system window.open calls.
+ * Uses @capacitor/browser which calls the correct Android API (startActivity
+ * with a proper VIEW intent) and WKWebView openURL on iOS.  The system browser
+ * receives Content-Disposition: attachment and handles the download natively.
  */
-function openExternal(absoluteUrl: string): void {
-  if (getPlatform() === 'android') {
-    const u = new URL(absoluteUrl);
-    const intentUrl =
-      `intent://${u.host}${u.pathname}${u.search}` +
-      `#Intent;scheme=${u.protocol.replace(':', '')};` +
-      `action=android.intent.action.VIEW;` +
-      `S.browser_fallback_url=${encodeURIComponent(absoluteUrl)};end`;
-    // Simulate a real tap — Capacitor's shouldOverrideUrlLoading fires on anchor clicks
-    // but may swallow programmatic window.location.href assignments.
-    const a = document.createElement('a');
-    a.href = intentUrl;
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+async function openExternal(absoluteUrl: string): Promise<void> {
+  const platform = getPlatform();
+  if (platform === 'android' || platform === 'ios') {
+    // webpackIgnore keeps the server build clean; the native WebView has the
+    // package available at runtime after `npx cap sync android`.
+    const { Browser } = await import(/* webpackIgnore: true */ '@capacitor/browser');
+    await Browser.open({ url: absoluteUrl });
   } else {
-    window.open(absoluteUrl, '_system');
+    window.open(absoluteUrl, '_blank');
   }
 }
 
@@ -75,30 +54,11 @@ async function createToken(photoIds: number[]): Promise<string> {
 export async function downloadPhotoNative(photoId: number): Promise<void> {
   const platform = getPlatform();
   console.log('[download] downloadPhotoNative — photoId:', photoId, 'platform:', platform);
-  console.log('[download] isNative check:', typeof window !== 'undefined' && !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.());
 
   const token = await createToken([photoId]);
   const downloadUrl = toAbsolute(`/api/photos/single/download/${token}`);
   console.log('[download] downloadUrl:', downloadUrl);
-
-  if (platform === 'android') {
-    const u = new URL(downloadUrl);
-    const intentUrl =
-      `intent://${u.host}${u.pathname}${u.search}` +
-      `#Intent;scheme=${u.protocol.replace(':', '')};` +
-      `action=android.intent.action.VIEW;` +
-      `S.browser_fallback_url=${encodeURIComponent(downloadUrl)};end`;
-    console.log('[download] Android intent URL:', intentUrl);
-    const a = document.createElement('a');
-    a.href = intentUrl;
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } else {
-    console.log('[download] iOS/web — window.open _system');
-    window.open(downloadUrl, '_system');
-  }
+  await openExternal(downloadUrl);
 }
 
 export async function downloadZipNative(photoIds: number[]): Promise<void> {
