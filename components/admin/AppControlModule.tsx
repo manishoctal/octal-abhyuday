@@ -7,7 +7,7 @@ import {
   CalendarDays, Trophy, ImageIcon, Vote, MessageSquare, BarChart3,
   QrCode, MapPin, Star, CheckCircle2, AlertTriangle, Wifi, WifiOff,
   ShieldCheck, ShieldPlus, ShieldOff, X, Crown, ChevronUp, ChevronDown, GripVertical,
-  Timer, Save, ScanFace, Download,
+  Timer, Save, ScanFace, Download, Hotel, CreditCard,
 } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -59,6 +59,8 @@ interface ConfigData {
   uploadEnabled: boolean;
   downloadEnabled: boolean;
   dbExportEnabled: boolean;
+  roomEnabled: boolean;
+  aadharEnabled: boolean;
 }
 
 type AdminEntry = { code: string; name: string | null; department: string | null };
@@ -78,6 +80,8 @@ export default function AppControlModule() {
   const [uploadToggling, setUploadToggling]           = useState(false);
   const [downloadToggling, setDownloadToggling]       = useState(false);
   const [dbExportToggling, setDbExportToggling]       = useState(false);
+  const [roomToggling, setRoomToggling]               = useState(false);
+  const [aadharToggling, setAadharToggling]           = useState(false);
   const [dbDownloading, setDbDownloading]           = useState(false);
   const [saving, setSaving]   = useState(false);
 
@@ -201,6 +205,28 @@ export default function AppControlModule() {
     });
     await mutate();
     setDbExportToggling(false);
+  }
+
+  async function toggleRoom() {
+    setRoomToggling(true);
+    await fetch('/api/admin/app-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room_section_enabled: !(data?.roomEnabled ?? true) }),
+    });
+    await mutate();
+    setRoomToggling(false);
+  }
+
+  async function toggleAadhar() {
+    setAadharToggling(true);
+    await fetch('/api/admin/app-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aadhar_section_enabled: !(data?.aadharEnabled ?? true) }),
+    });
+    await mutate();
+    setAadharToggling(false);
   }
 
   async function downloadDb() {
@@ -549,6 +575,60 @@ export default function AppControlModule() {
                   : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
               }`}>
               {(data?.downloadEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
+            </button>
+          </div>
+
+          {/* ── Hotel Room section toggle ── */}
+          <div className="px-5 py-3.5 flex items-center gap-3 border-t border-slate-50">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
+              style={{ background: (data?.roomEnabled ?? true) ? '#D97706' : '#CBD5E1' }}>
+              <Hotel size={16} />
+            </div>
+            <div className="flex-1">
+              <p className={`font-semibold text-sm ${(data?.roomEnabled ?? true) ? 'text-slate-800' : 'text-slate-400'}`}>
+                Hotel Room Section
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {(data?.roomEnabled ?? true)
+                  ? "Room card visible on employee's My Badge page"
+                  : "Room card hidden — even if rooms are assigned"}
+              </p>
+            </div>
+            {roomToggling && <RefreshCw size={13} className="text-slate-300 animate-spin" />}
+            <button onClick={toggleRoom} disabled={roomToggling}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${
+                (data?.roomEnabled ?? true)
+                  ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+              }`}>
+              {(data?.roomEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
+            </button>
+          </div>
+
+          {/* ── Aadhar Card section toggle ── */}
+          <div className="px-5 py-3.5 flex items-center gap-3 border-t border-slate-50">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
+              style={{ background: (data?.aadharEnabled ?? true) ? '#6366F1' : '#CBD5E1' }}>
+              <CreditCard size={16} />
+            </div>
+            <div className="flex-1">
+              <p className={`font-semibold text-sm ${(data?.aadharEnabled ?? true) ? 'text-slate-800' : 'text-slate-400'}`}>
+                Aadhar Card Section
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {(data?.aadharEnabled ?? true)
+                  ? "Aadhar upload link visible on employee's My Badge page"
+                  : 'Aadhar section hidden from employees'}
+              </p>
+            </div>
+            {aadharToggling && <RefreshCw size={13} className="text-slate-300 animate-spin" />}
+            <button onClick={toggleAadhar} disabled={aadharToggling}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${
+                (data?.aadharEnabled ?? true)
+                  ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+              }`}>
+              {(data?.aadharEnabled ?? true) ? <><Unlock size={12}/>Enabled</> : <><Lock size={12}/>Disabled</>}
             </button>
           </div>
         </div>

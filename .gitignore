@@ -1,4 +1,5 @@
 node_modules/
+android/
 .next/
 data/*.db
 data/*.db-shm

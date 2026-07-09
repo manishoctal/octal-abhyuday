@@ -53,33 +53,51 @@ function openExternal(absoluteUrl: string): void {
 }
 
 async function createToken(photoIds: number[]): Promise<string> {
+  console.log('[download] createToken →', photoIds);
   const res = await fetch('/api/photos/zip-token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ photoIds }),
   });
-  if (!res.ok) throw new Error('Failed to create download token');
-  const { token } = await res.json();
-  return token as string;
+  console.log('[download] zip-token response status:', res.status);
+  if (!res.ok) throw new Error(`Failed to create download token (HTTP ${res.status})`);
+  const body = await res.json();
+  console.log('[download] token received:', body.token ? body.token.slice(0, 12) + '…' : 'MISSING');
+  return body.token as string;
 }
 
-/**
- * Downloads a single photo in the native Capacitor app.
- * Creates a short-lived token → opens /api/photos/single/download/[token] externally.
- * The server responds with Content-Disposition: attachment, triggering the browser download.
- */
 export async function downloadPhotoNative(photoId: number): Promise<void> {
+  const platform = getPlatform();
+  console.log('[download] downloadPhotoNative — photoId:', photoId, 'platform:', platform);
+  console.log('[download] isNative check:', typeof window !== 'undefined' && !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.());
+
   const token = await createToken([photoId]);
-  openExternal(toAbsolute(`/api/photos/single/download/${token}`));
+  const downloadUrl = toAbsolute(`/api/photos/single/download/${token}`);
+  console.log('[download] downloadUrl:', downloadUrl);
+
+  if (platform === 'android') {
+    const u = new URL(downloadUrl);
+    const intentUrl =
+      `intent://${u.host}${u.pathname}${u.search}` +
+      `#Intent;scheme=${u.protocol.replace(':', '')};` +
+      `action=android.intent.action.VIEW;` +
+      `S.browser_fallback_url=${encodeURIComponent(downloadUrl)};end`;
+    console.log('[download] Android intent URL:', intentUrl);
+    window.location.href = intentUrl;
+  } else {
+    console.log('[download] iOS/web — window.open _system');
+    window.open(downloadUrl, '_system');
+  }
 }
 
-/**
- * Downloads selected photos as a ZIP in the native Capacitor app.
- * Creates a short-lived token → opens /api/photos/zip/download/[token] externally.
- */
 export async function downloadZipNative(photoIds: number[]): Promise<void> {
+  const platform = getPlatform();
+  console.log('[download] downloadZipNative — photoIds:', photoIds, 'platform:', platform);
+
   const token = await createToken(photoIds);
-  openExternal(toAbsolute(`/api/photos/zip/download/${token}`));
+  const downloadUrl = toAbsolute(`/api/photos/zip/download/${token}`);
+  console.log('[download] zip downloadUrl:', downloadUrl);
+  openExternal(downloadUrl);
 }
 
 /**

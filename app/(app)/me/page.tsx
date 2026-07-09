@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import Header from '@/components/Header';
-import { getAppState, getAttendance, getEmployeeByEmail, getRoomForEmployee, getModuleConfig, getUserById } from '@/lib/db';
+import { getAppState, getAttendance, getEmployeeByEmail, getRoomForEmployee, getModuleConfig, getUserById, getSetting } from '@/lib/db';
 import MyQrClient from '@/components/MyQrClient';
 import RoomCard from '@/components/RoomCard';
 
@@ -17,9 +17,11 @@ export default async function MePage() {
   const emp           = getEmployeeByEmail(session.email);
   const userRecord    = getUserById(session.id);
   const room          = emp ? getRoomForEmployee(emp.id) : null;
-  const moduleConfig  = getModuleConfig();
-  const checkinEnabled = moduleConfig.enabled['badge'] !== false;
-  const photoUrl      = userRecord?.profile_photo_url ?? emp?.profile_photo_url ?? null;
+  const moduleConfig    = getModuleConfig();
+  const checkinEnabled  = moduleConfig.enabled['badge'] !== false;
+  const roomSectionEnabled   = getSetting('room_section_enabled') !== '0';
+  const aadharSectionEnabled = getSetting('aadhar_section_enabled') !== '0';
+  const photoUrl        = userRecord?.profile_photo_url ?? emp?.profile_photo_url ?? null;
 
   return (
     <>
@@ -35,10 +37,10 @@ export default async function MePage() {
           checkinEnabled={checkinEnabled}
         />
 
-        {room && <RoomCard room={room} />}
+        {roomSectionEnabled && room && <RoomCard room={room} />}
 
         {/* Aadhar Card */}
-        {emp && (
+        {aadharSectionEnabled && emp && (
           <Link
             href="/aadhar"
             className="card mt-4 px-5 py-4 flex items-center justify-between active:scale-[0.99] transition-transform"

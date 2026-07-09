@@ -44,8 +44,10 @@ export async function GET() {
   const uploadEnabled      = getSetting('photo_upload_enabled')  !== '0';
   const downloadEnabled    = getSetting('photo_download_enabled') !== '0';
   const dbExportEnabled    = getSetting('db_export_enabled')     !== '0';
+  const roomEnabled        = getSetting('room_section_enabled')  !== '0';
+  const aadharEnabled      = getSetting('aadhar_section_enabled') !== '0';
 
-  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig, faceSearchEnabled, uploadEnabled, downloadEnabled, dbExportEnabled });
+  return NextResponse.json({ moduleConfig, moduleOrder, pushStats, pushConfig, authConfig, faceSearchEnabled, uploadEnabled, downloadEnabled, dbExportEnabled, roomEnabled, aadharEnabled });
 }
 
 export async function POST(req: Request) {
@@ -81,6 +83,18 @@ export async function POST(req: Request) {
   // Toggle DB export
   if ('db_export_enabled' in body) {
     setSetting('db_export_enabled', body.db_export_enabled ? '1' : '0');
+    return NextResponse.json({ ok: true });
+  }
+
+  // Toggle Hotel Room section
+  if ('room_section_enabled' in body) {
+    setSetting('room_section_enabled', body.room_section_enabled ? '1' : '0');
+    return NextResponse.json({ ok: true });
+  }
+
+  // Toggle Aadhar Card section
+  if ('aadhar_section_enabled' in body) {
+    setSetting('aadhar_section_enabled', body.aadhar_section_enabled ? '1' : '0');
     return NextResponse.json({ ok: true });
   }
 
