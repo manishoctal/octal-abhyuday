@@ -40,13 +40,19 @@ function toAbsolute(url: string): string {
 function openExternal(absoluteUrl: string): void {
   if (getPlatform() === 'android') {
     const u = new URL(absoluteUrl);
-    // intent:// URL triggers shouldOverrideUrlLoading → startActivity(Intent) → Chrome
     const intentUrl =
       `intent://${u.host}${u.pathname}${u.search}` +
       `#Intent;scheme=${u.protocol.replace(':', '')};` +
       `action=android.intent.action.VIEW;` +
       `S.browser_fallback_url=${encodeURIComponent(absoluteUrl)};end`;
-    window.location.href = intentUrl;
+    // Simulate a real tap — Capacitor's shouldOverrideUrlLoading fires on anchor clicks
+    // but may swallow programmatic window.location.href assignments.
+    const a = document.createElement('a');
+    a.href = intentUrl;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   } else {
     window.open(absoluteUrl, '_system');
   }
@@ -83,7 +89,12 @@ export async function downloadPhotoNative(photoId: number): Promise<void> {
       `action=android.intent.action.VIEW;` +
       `S.browser_fallback_url=${encodeURIComponent(downloadUrl)};end`;
     console.log('[download] Android intent URL:', intentUrl);
-    window.location.href = intentUrl;
+    const a = document.createElement('a');
+    a.href = intentUrl;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   } else {
     console.log('[download] iOS/web — window.open _system');
     window.open(downloadUrl, '_system');
