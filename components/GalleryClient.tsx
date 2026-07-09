@@ -891,9 +891,17 @@ export default function GalleryClient({
                 {group.photos.map((p, i) => {
                   const isSelected = selectedIds.has(p.id);
                   return (
-                    <button key={p.id}
+                    <div key={p.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => selectMode ? toggleSelect(p.id) : openLightbox(group.photos, i)}
-                      className="relative aspect-square overflow-hidden bg-slate-100 transition-opacity"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          selectMode ? toggleSelect(p.id) : openLightbox(group.photos, i);
+                        }
+                      }}
+                      className="relative aspect-square overflow-hidden bg-slate-100 transition-opacity cursor-pointer"
                       style={!selectMode ? undefined : { opacity: isSelected ? 1 : 0.6 }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={p.thumbnail_url ?? p.url} alt={p.caption ?? ''} className="w-full h-full object-cover" loading="lazy"
@@ -928,7 +936,7 @@ export default function GalleryClient({
                             : <X size={13} color="white" strokeWidth={2.5} />}
                         </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
