@@ -13,22 +13,28 @@ const fetcher = (u: string) => fetch(u).then(r => r.json());
 export default function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   const path = usePathname();
   const searchParams = useSearchParams();
-  const { data } = useSWR('/api/state', fetcher, { refreshInterval: 30000 });
+  const { data }       = useSWR('/api/state',      fetcher, { refreshInterval: 30000 });
+  const { data: cfg }  = useSWR('/api/app-config', fetcher, { refreshInterval: 60000 });
   useRealtime(['/api/state']);
   usePushRegistration();
   useWebPushSubscription(isAdmin);
 
   const isLive = data?.state?.voting_state === 'live' || data?.state?.voting_state === 'paused';
+  const vis: Record<string, boolean> = cfg?.visibility ?? {};
+
+  // A tab is visible when the setting hasn't loaded yet (default true) OR when visible.
+  const show = (key: string) => vis[key] !== false;
+
   const hideForRequiredProfile = path === '/profile' && searchParams.get('required') === '1';
   if (hideForRequiredProfile) return null;
 
   const tabs = [
-    { href: '/',         label: 'Home',     Icon: Home,        match: (p: string) => p === '/' },
-    { href: '/schedule', label: 'Schedule', Icon: CalendarDays, match: (p: string) => p.startsWith('/schedule') },
-    { href: '/live',     label: 'Live',     Icon: Zap,          match: (p: string) => ['/live','/vote','/qna'].includes(p), pulse: isLive },
-    { href: '/gallery',  label: 'Gallery',  Icon: ImageIcon,    match: (p: string) => p.startsWith('/gallery') },
-    { href: '/me',       label: 'Me',       Icon: User,         match: (p: string) => ['/me','/feedback','/leaderboard','/aadhar'].includes(p) },
-  ];
+    { href: '/',         label: 'Home',     Icon: Home,         match: (p: string) => p === '/',                                               show: true },
+    { href: '/schedule', label: 'Schedule', Icon: CalendarDays, match: (p: string) => p.startsWith('/schedule'),                               show: show('schedule') },
+    { href: '/live',     label: 'Live',     Icon: Zap,          match: (p: string) => ['/live','/vote','/qna'].includes(p), pulse: isLive,     show: show('vote') || show('qna') },
+    { href: '/gallery',  label: 'Gallery',  Icon: ImageIcon,    match: (p: string) => p.startsWith('/gallery'),                                show: show('gallery') },
+    { href: '/me',       label: 'Me',       Icon: User,         match: (p: string) => ['/me','/feedback','/leaderboard','/aadhar'].includes(p), show: true },
+  ].filter(t => t.show);
 
   return (
     <nav
