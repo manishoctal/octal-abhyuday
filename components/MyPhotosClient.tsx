@@ -193,7 +193,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
         const ext = photo.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
-        await triggerDownload(blob, `event-photo-${photo.id}.${ext}`, blob.type || 'image/jpeg');
+        triggerDownload(blob, `event-photo-${photo.id}.${ext}`);
       }
     } catch {
       setDownloadError('Download failed. Please try again.');
@@ -298,7 +298,7 @@ export default function MyPhotosClient({ faceSearchEnabled = true, downloadEnabl
       }
 
       const blob = new Blob(chunks as BlobPart[], { type: 'application/zip' });
-      await triggerDownload(blob, 'my-event-photos.zip', 'application/zip');
+      triggerDownload(blob, 'my-event-photos.zip');
     } catch {
       setDownloadError('Download failed. Please check your connection and try again.');
     } finally {

@@ -199,7 +199,7 @@ function Lightbox({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
         const ext = p.url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
-        await triggerDownload(blob, `photo-${p.id}.${ext}`, blob.type || 'image/jpeg');
+        triggerDownload(blob, `photo-${p.id}.${ext}`);
       }
       setDlState('idle');
     } catch {
@@ -753,7 +753,7 @@ export default function GalleryClient({
           setDownloadProgress(Math.round((received / contentLength) * 100));
       }
       const blob = new Blob(chunks as BlobPart[], { type: 'application/zip' });
-      await triggerDownload(blob, `event-photos-${selectedIds.size}.zip`, 'application/zip');
+      triggerDownload(blob, `event-photos-${selectedIds.size}.zip`);
       exitSelectMode();
     } catch {
       setDownloadError('Download failed. Check your connection and try again.');

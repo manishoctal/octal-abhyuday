@@ -64,28 +64,10 @@ export async function downloadZipNative(photoIds: number[]): Promise<void> {
 }
 
 /**
- * Triggers a file download from a Blob on desktop/web browsers.
- * Falls back to Web Share API when available (some mobile browsers).
+ * Triggers a file download from a Blob in web/desktop browsers.
+ * Capacitor native builds never reach this — they use downloadPhotoNative / downloadZipNative.
  */
-export async function triggerDownload(
-  blob: Blob,
-  filename: string,
-  mimeType: string,
-): Promise<void> {
-  // Web Share API with files — works in some browsers/PWA contexts
-  if (typeof navigator !== 'undefined' && navigator.canShare) {
-    try {
-      const file = new File([blob], filename, { type: mimeType });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        return;
-      }
-    } catch (e) {
-      if ((e as Error)?.name === 'AbortError') return; // user cancelled
-    }
-  }
-
-  // Anchor click — reliable in desktop browsers
+export function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
