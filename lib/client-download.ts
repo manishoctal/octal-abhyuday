@@ -25,13 +25,28 @@ function toAbsolute(url: string): string {
  * with a proper VIEW intent) and WKWebView openURL on iOS.  The system browser
  * receives Content-Disposition: attachment and handles the download natively.
  */
+type BrowserPlugin = { open: (opts: { url: string }) => Promise<void> };
+
 async function openExternal(absoluteUrl: string): Promise<void> {
   const platform = getPlatform();
   if (platform === 'android' || platform === 'ios') {
-    // webpackIgnore keeps the server build clean; the native WebView has the
-    // package available at runtime after `npx cap sync android`.
-    const { Browser } = await import(/* webpackIgnore: true */ '@capacitor/browser');
-    await Browser.open({ url: absoluteUrl });
+    // Call the natively-registered plugin via the Capacitor bridge directly.
+    // A bare `import('@capacitor/browser')` cannot resolve inside the WebView
+    // because this app is remote-hosted (server.url) — the bridge object is
+    // the only reliable handle to native plugins.
+    const cap = (window as unknown as {
+      Capacitor?: { Plugins?: { Browser?: BrowserPlugin } };
+    }).Capacitor;
+    const browser = cap?.Plugins?.Browser;
+    console.log('[download] Browser plugin available:', !!browser);
+    if (browser) {
+      await browser.open({ url: absoluteUrl });
+      console.log('[download] Browser.open resolved');
+      return;
+    }
+    // Old APK without the Browser plugin — last-resort fallback.
+    console.warn('[download] Browser plugin missing — falling back to window.open');
+    window.open(absoluteUrl, '_blank');
   } else {
     window.open(absoluteUrl, '_blank');
   }
